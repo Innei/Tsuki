@@ -8,9 +8,12 @@ A collection of TypeScript libraries for building enterprise-grade server applic
 
 ## Packages
 
-| Package                                    | Description                                                                                                                                      |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| [`@tsuki/framework`](./packages/framework) | A NestJS-inspired web framework built on Hono with DI, decorators, guards, pipes, interceptors, filters, middleware, events, and OpenAPI support |
+| Package                                            | Description                                                            |
+| -------------------------------------------------- | ---------------------------------------------------------------------- |
+| [`@tsuki/common`](./packages/common)               | Decorators, interfaces, exceptions, pipes, logger, and request context |
+| [`@tsuki/core`](./packages/core)                   | Application runtime, DI container utils, route registration            |
+| [`@tsuki/event-emitter`](./packages/event-emitter) | Redis pub/sub event system with `@OnEvent` / `@EmitEvent`              |
+| [`@tsuki/openapi`](./packages/openapi)             | OpenAPI 3.1 document generation from decorator metadata                |
 
 ## Quick Start
 
@@ -31,7 +34,8 @@ pnpm test
 ```ts
 import 'reflect-metadata';
 import { serve } from '@hono/node-server';
-import { Module, Controller, Get, createApplication } from '@tsuki/framework';
+import { Module, Controller, Get } from '@tsuki/common';
+import { createApplication } from '@tsuki/core';
 
 @Controller('hello')
 class HelloController {
@@ -52,7 +56,7 @@ async function bootstrap() {
 bootstrap();
 ```
 
-See the [framework README](./packages/framework/README.md) for full documentation.
+See individual package READMEs for detailed documentation.
 
 ## Development
 
