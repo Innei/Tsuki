@@ -1,8 +1,11 @@
+import type {
+  ArgumentsHost,
+  ExecutionContext,
+  HttpArgumentsHost,
+  HttpContextValues,
+} from '@tsuki/common';
+import { HttpContext } from '@tsuki/common';
 import type { DependencyContainer } from 'tsyringe';
-
-import type { HttpContextValues } from '../context/http-context';
-import { HttpContext } from '../context/http-context';
-import type { ArgumentsHost, ExecutionContext, HttpArgumentsHost } from '../interfaces';
 
 class HttpArgumentsHostImpl implements HttpArgumentsHost {
   getContext<T = HttpContextValues>(): T {

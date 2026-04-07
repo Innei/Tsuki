@@ -9,7 +9,7 @@ import {
   resetContainerRef,
   runWithContainer,
   setContainerRef,
-} from '../src/utils/container-ref';
+} from '../src';
 
 type TestContainer = {
   registrations: Map<unknown, () => unknown>;

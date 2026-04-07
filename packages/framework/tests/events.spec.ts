@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Constructor } from '../src';
 import {
+  ContainerRef,
   createApplication,
   EmitEvent,
   EventEmitterService,
@@ -13,7 +14,6 @@ import {
   Module,
   OnEvent,
 } from '../src';
-import { ContainerRef } from '../src/utils/container-ref';
 
 /**
  * A simple in-memory Redis mock compatible with the minimal interface used by the event system.

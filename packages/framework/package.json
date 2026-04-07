@@ -16,20 +16,20 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "hono": "4.11.9",
-    "picocolors": "1.1.1",
-    "reflect-metadata": "0.2.2",
-    "tsyringe": "4.10.0",
-    "zod": "^4.3.6"
+    "@tsuki/common": "workspace:*",
+    "@tsuki/core": "workspace:*",
+    "@tsuki/event-emitter": "workspace:*",
+    "@tsuki/openapi": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^25.2.3",
     "@vitest/coverage-v8": "4.0.18",
+    "hono": "4.11.9",
     "ioredis": "5.9.3",
+    "reflect-metadata": "0.2.2",
+    "tsyringe": "4.10.0",
     "unplugin-swc": "1.5.9",
-    "vitest": "4.0.18"
-  },
-  "peerDependencies": {
-    "ioredis": ">=5.8.0"
+    "vitest": "4.0.18",
+    "zod": "^4.3.6"
   }
 }
