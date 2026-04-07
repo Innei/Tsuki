@@ -1,0 +1,9 @@
+{
+  "name": "tsuki",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.29.3",
+  "scripts": {
+    "test": "pnpm -r run test"
+  }
+}

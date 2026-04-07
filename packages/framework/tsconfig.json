@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "incremental": true,
+    "target": "esnext",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "baseUrl": "./src",
+    "paths": {
+      "@tsuki/framework": ["./index.ts"],
+      "@tsuki/framework/*": ["./*"],
+      "~": ["./"],
+      "~/*": ["./*"]
+    },
+    "resolveJsonModule": true,
+    "strict": true,
+    "noImplicitAny": false,
+    "declaration": false,
+    "outDir": "./dist",
+    "removeComments": true,
+    "sourceMap": true,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "types": ["node"]
+  },
+  "include": ["src/**/*", "tests/**/*", "vitest.setup.ts"],
+  "exclude": []
+}
