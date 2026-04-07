@@ -70,8 +70,8 @@ importers:
         specifier: ^25.2.3
         version: 25.5.2
       hono:
-        specifier: 4.11.9
-        version: 4.11.9
+        specifier: 4.12.7
+        version: 4.12.7
       unplugin-swc:
         specifier: 1.5.9
         version: 1.5.9(@swc/core@1.15.24)(rollup@4.60.1)
@@ -85,8 +85,8 @@ importers:
         specifier: workspace:*
         version: link:../common
       hono:
-        specifier: 4.11.9
-        version: 4.11.9
+        specifier: 4.12.7
+        version: 4.12.7
       picocolors:
         specifier: 1.1.1
         version: 1.1.1
@@ -129,8 +129,8 @@ importers:
         specifier: ^25.2.3
         version: 25.5.2
       hono:
-        specifier: 4.11.9
-        version: 4.11.9
+        specifier: 4.12.7
+        version: 4.12.7
       ioredis:
         specifier: 5.9.3
         version: 5.9.3
@@ -2024,8 +2024,8 @@ packages:
   hermes-parser@0.25.1:
     resolution: {integrity: sha512-6pEjquH3rqaI6cYAXYPcz9MS4rY6R4ngRgrgfDshRptUZIc3lw0MCIJIGDj9++mfySOuPTHB4nrSW99BCvOPIA==}
 
-  hono@4.11.9:
-    resolution: {integrity: sha512-Eaw2YTGM6WOxA6CXbckaEvslr2Ne4NFsKrvc0v97JD5awbmeBLO5w9Ho9L9kmKonrwF9RJlW6BxT1PVv/agBHQ==}
+  hono@4.12.7:
+    resolution: {integrity: sha512-jq9l1DM0zVIvsm3lv9Nw9nlJnMNPOcAtsbsgiUhWcFzPE99Gvo6yRTlszSLLYacMeQ6quHD6hMfId8crVHvexw==}
     engines: {node: '>=16.9.0'}
 
   hookable@6.1.0:
@@ -5196,7 +5196,7 @@ snapshots:
     dependencies:
       hermes-estree: 0.25.1
 
-  hono@4.11.9: {}
+  hono@4.12.7: {}
 
   hookable@6.1.0: {}
 
