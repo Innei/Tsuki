@@ -10,6 +10,10 @@
   },
   "main": "./src/index.ts",
   "types": "./src/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
   "dependencies": {
     "@tsuki/common": "workspace:*",
     "@tsuki/core": "workspace:*",
@@ -18,7 +22,10 @@
   },
   "devDependencies": {
     "@types/node": "^25.2.3",
-    "ioredis": "5.9.3"
+    "hono": "4.11.9",
+    "ioredis": "5.9.3",
+    "unplugin-swc": "1.5.9",
+    "vitest": "4.0.18"
   },
   "peerDependencies": {
     "ioredis": ">=5.8.0"

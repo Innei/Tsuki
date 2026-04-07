@@ -1,7 +1,5 @@
 import 'reflect-metadata';
 
-import { beforeEach, describe, expect, it } from 'vitest';
-
 import {
   ContainerRef,
   getContainerRef,
@@ -9,7 +7,8 @@ import {
   resetContainerRef,
   runWithContainer,
   setContainerRef,
-} from '../src';
+} from '@tsuki/core';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 type TestContainer = {
   registrations: Map<unknown, () => unknown>;

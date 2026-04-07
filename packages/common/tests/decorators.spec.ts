@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 
+import { createExecutionContext } from '@tsuki/core';
 import type { Context } from 'hono';
 import { injectable } from 'tsyringe';
 import { describe, expect, it } from 'vitest';
@@ -18,7 +19,6 @@ import {
   BadRequestException,
   Body,
   Controller,
-  createExecutionContext,
   createZodDto,
   createZodSchemaDto,
   createZodValidationPipe,
@@ -50,7 +50,7 @@ import {
   ZodValidationPipe,
 } from '../src';
 
-declare module '../src/context/http-context' {
+declare module '@tsuki/common' {
   interface HttpContextValues {
     custom?: string;
   }

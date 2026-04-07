@@ -2,11 +2,6 @@ import 'reflect-metadata';
 
 import { ReadableStream } from 'node:stream/web';
 
-import type { Context, Next } from 'hono';
-import { injectable } from 'tsyringe';
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { z } from 'zod';
-
 import type {
   ArgumentMetadata,
   ArgumentsHost,
@@ -26,7 +21,7 @@ import type {
   OnModuleInit,
   PipeTransform,
   RouteParamMetadataItem,
-} from '../src';
+} from '@tsuki/common';
 import {
   APP_FILTER,
   APP_GUARD,
@@ -37,13 +32,11 @@ import {
   Body,
   ContextParam,
   Controller,
-  createApplication,
   createLogger,
   Delete,
   forwardRef,
   Get,
   Headers,
-  HonoHttpApplication,
   HttpContext,
   Middleware,
   Module,
@@ -58,13 +51,18 @@ import {
   UseInterceptors,
   ZodSchema,
   ZodValidationPipe,
-} from '../src';
+} from '@tsuki/common';
+import { createApplication, HonoHttpApplication } from '@tsuki/core';
+import type { Context, Next } from 'hono';
+import { injectable } from 'tsyringe';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { z } from 'zod';
 
 const BASE_URL = 'http://localhost';
 
 const GENERATED_RESPONSE = Symbol.for('hono.framework.generatedResponse');
 
-declare module '../src/context/http-context' {
+declare module '@tsuki/common' {
   interface HttpContextValues {
     auth?: {
       apiKey?: string;

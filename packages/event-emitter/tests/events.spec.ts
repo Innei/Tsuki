@@ -1,19 +1,12 @@
 import 'reflect-metadata';
 
+import type { Constructor } from '@tsuki/common';
+import { getModuleMetadata, Module } from '@tsuki/common';
+import { ContainerRef, createApplication } from '@tsuki/core';
 import { injectable } from 'tsyringe';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { Constructor } from '../src';
-import {
-  ContainerRef,
-  createApplication,
-  EmitEvent,
-  EventEmitterService,
-  EventModule,
-  getModuleMetadata,
-  Module,
-  OnEvent,
-} from '../src';
+import { EmitEvent, EventEmitterService, EventModule, OnEvent } from '../src';
 
 /**
  * A simple in-memory Redis mock compatible with the minimal interface used by the event system.
