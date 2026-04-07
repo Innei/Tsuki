@@ -1,6 +1,13 @@
 {
   "name": "@tsuki/common",
   "version": "0.1.0",
+  "description": "Shared decorators, interfaces, exceptions, pipes, logger, and context for Tsuki framework",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/innei/tsuki",
+    "directory": "packages/common"
+  },
+  "license": "MIT",
   "type": "module",
   "exports": {
     ".": {
@@ -10,7 +17,11 @@
   },
   "main": "./src/index.ts",
   "types": "./src/index.ts",
+  "files": [
+    "dist"
+  ],
   "scripts": {
+    "build": "tsdown",
     "test": "vitest run",
     "test:watch": "vitest"
   },
@@ -29,5 +40,16 @@
   },
   "peerDependencies": {
     "hono": ">=4.0.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      }
+    },
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts"
   }
 }

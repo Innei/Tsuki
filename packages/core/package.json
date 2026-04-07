@@ -1,6 +1,13 @@
 {
   "name": "@tsuki/core",
   "version": "0.1.0",
+  "description": "Application runtime, DI container, and metadata utils for Tsuki framework",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/innei/tsuki",
+    "directory": "packages/core"
+  },
+  "license": "MIT",
   "type": "module",
   "exports": {
     ".": {
@@ -10,7 +17,11 @@
   },
   "main": "./src/index.ts",
   "types": "./src/index.ts",
+  "files": [
+    "dist"
+  ],
   "scripts": {
+    "build": "tsdown",
     "test": "vitest run",
     "test:watch": "vitest"
   },
@@ -26,5 +37,16 @@
     "unplugin-swc": "1.5.9",
     "vitest": "4.0.18",
     "zod": "^4.3.6"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      }
+    },
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts"
   }
 }

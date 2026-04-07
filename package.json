@@ -3,10 +3,15 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build": "pnpm -r run build",
+    "changelog": "changelogithub",
     "format": "prettier --write .",
     "lint": "eslint . --fix",
     "prepare": "simple-git-hooks",
-    "test": "pnpm -r run test"
+    "publish:npm": "pnpm -r publish --access public --no-git-checks",
+    "release": "bumpp -r --all",
+    "test": "pnpm -r run test",
+    "typecheck": "pnpm -r exec tsc --noEmit"
   },
   "simple-git-hooks": {
     "pre-commit": "pnpm lint-staged"
@@ -18,13 +23,17 @@
   "devDependencies": {
     "@lobehub/eslint-config": "^2.1.5",
     "@lobehub/prettier-config": "^2.1.5",
+    "bumpp": "^11.0.1",
+    "changelogithub": "^14.0.0",
     "eslint": "^10.2.0",
     "lint-staged": "^16.4.0",
     "prettier": "^3.8.1",
     "prettier-plugin-packagejson": "^3.0.2",
     "prettier-plugin-sh": "^0.18.1",
     "prettier-plugin-sort-json": "^4.2.0",
-    "simple-git-hooks": "^2.13.1"
+    "simple-git-hooks": "^2.13.1",
+    "tsdown": "^0.21.7",
+    "typescript": "^5.8.3"
   },
   "packageManager": "pnpm@10.29.3"
 }
