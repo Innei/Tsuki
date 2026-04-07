@@ -25,6 +25,6 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["src/**/*", "tests/**/*", "vitest.setup.ts"],
-  "exclude": []
+  "exclude": [],
+  "include": ["src/**/*", "tests/**/*", "vitest.setup.ts"]
 }

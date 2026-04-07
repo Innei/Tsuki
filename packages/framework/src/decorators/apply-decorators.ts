@@ -8,7 +8,10 @@
  *
  * @publicApi
  */
-export function applyDecorators(...decorators: Array<ClassDecorator | MethodDecorator | PropertyDecorator>) {
+export function applyDecorators(
+  ...decorators: Array<ClassDecorator | MethodDecorator | PropertyDecorator>
+) {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
   return <TFunction extends Function, Y>(
     target: TFunction | object,
     propertyKey?: string | symbol,
@@ -16,10 +19,10 @@ export function applyDecorators(...decorators: Array<ClassDecorator | MethodDeco
   ) => {
     for (const decorator of decorators) {
       if (typeof target === 'function' && !descriptor) {
-        ;(decorator as ClassDecorator)(target)
-        continue
+        (decorator as ClassDecorator)(target);
+        continue;
       }
-      ;(decorator as MethodDecorator | PropertyDecorator)(target, propertyKey!, descriptor!)
+      (decorator as MethodDecorator | PropertyDecorator)(target, propertyKey!, descriptor!);
     }
-  }
+  };
 }

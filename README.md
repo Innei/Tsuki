@@ -8,8 +8,8 @@ A collection of TypeScript libraries for building enterprise-grade server applic
 
 ## Packages
 
-| Package | Description |
-|---------|-------------|
+| Package                                    | Description                                                                                                                                      |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
 | [`@tsuki/framework`](./packages/framework) | A NestJS-inspired web framework built on Hono with DI, decorators, guards, pipes, interceptors, filters, middleware, events, and OpenAPI support |
 
 ## Quick Start
@@ -29,15 +29,15 @@ pnpm test
 ## Usage
 
 ```ts
-import 'reflect-metadata'
-import { serve } from '@hono/node-server'
-import { Module, Controller, Get, createApplication } from '@tsuki/framework'
+import 'reflect-metadata';
+import { serve } from '@hono/node-server';
+import { Module, Controller, Get, createApplication } from '@tsuki/framework';
 
 @Controller('hello')
 class HelloController {
   @Get('/')
   greet() {
-    return { message: 'Hello from Tsuki!' }
+    return { message: 'Hello from Tsuki!' };
   }
 }
 
@@ -45,11 +45,11 @@ class HelloController {
 class AppModule {}
 
 async function bootstrap() {
-  const app = await createApplication(AppModule)
-  serve({ fetch: app.getInstance().fetch, port: 3000 })
+  const app = await createApplication(AppModule);
+  serve({ fetch: app.getInstance().fetch, port: 3000 });
 }
 
-bootstrap()
+bootstrap();
 ```
 
 See the [framework README](./packages/framework/README.md) for full documentation.
@@ -61,8 +61,8 @@ See the [framework README](./packages/framework/README.md) for full documentatio
 - **Test**: Vitest
 
 ```bash
-pnpm install          # Install all dependencies
-pnpm test             # Run all tests across packages
+pnpm install # Install all dependencies
+pnpm test    # Run all tests across packages
 ```
 
 ## License

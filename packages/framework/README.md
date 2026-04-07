@@ -46,37 +46,37 @@ A lightweight yet feature-complete enterprise framework built on Hono, providing
 
 ```ts
 // main.ts
-import 'reflect-metadata'
-import { serve } from '@hono/node-server'
-import { createApplication } from '@tsuki/framework'
-import { AppModule } from './app.module'
+import 'reflect-metadata';
+import { serve } from '@hono/node-server';
+import { createApplication } from '@tsuki/framework';
+import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await createApplication(AppModule, {
     globalPrefix: '/api',
-  })
+  });
 
   // Register global enhancers (optional) — pass INSTANCES
   // app.useGlobalGuards(new AuthGuard())
   // app.useGlobalPipes(new ValidationPipe())
   // Or use APP_* tokens in module providers (see below)
 
-  const hono = app.getInstance()
-  serve({ fetch: hono.fetch, port: 3000 })
+  const hono = app.getInstance();
+  serve({ fetch: hono.fetch, port: 3000 });
 }
 
-bootstrap()
+bootstrap();
 ```
 
 ```ts
 // app.module.ts
-import { Module, Controller, Get } from '@tsuki/framework'
+import { Module, Controller, Get } from '@tsuki/framework';
 
 @Controller('hello')
 class HelloController {
   @Get('/')
   sayHi() {
-    return { message: 'Hello tsuki!' }
+    return { message: 'Hello tsuki!' };
   }
 }
 
@@ -136,20 +136,26 @@ export class UserService implements OnModuleInit, OnModuleDestroy {
 - **Global enhancers** can be registered in two ways:
   1. **Instance-based** via `app.useGlobal*()` — pass instances only:
      ```ts
-     app.useGlobalGuards(new AuthGuard())
-     app.useGlobalPipes(new ValidationPipe())
-     app.useGlobalInterceptors(new LoggingInterceptor())
-     app.useGlobalFilters(new AllExceptionsFilter())
+     app.useGlobalGuards(new AuthGuard());
+     app.useGlobalPipes(new ValidationPipe());
+     app.useGlobalInterceptors(new LoggingInterceptor());
+     app.useGlobalFilters(new AllExceptionsFilter());
      app.useGlobalMiddlewares({
        handler: new RequestTracingMiddleware(),
        path: ['/api/*', /auth/],
        priority: -10,
-     })
+     });
      ```
   2. **Module-based** via `APP_*` tokens in providers (NestJS-style):
 
      ```ts
-     import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, APP_MIDDLEWARE, APP_PIPE } from '@tsuki/framework'
+     import {
+       APP_FILTER,
+       APP_GUARD,
+       APP_INTERCEPTOR,
+       APP_MIDDLEWARE,
+       APP_PIPE,
+     } from '@tsuki/framework';
 
      @Module({
        providers: [
@@ -157,7 +163,11 @@ export class UserService implements OnModuleInit, OnModuleDestroy {
          { provide: APP_PIPE, useValue: preconfiguredPipe },
          { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },
          { provide: APP_INTERCEPTOR, useClass: ResponseTransformInterceptor },
-         { provide: APP_FILTER, useFactory: (...deps) => new CustomFilter(...deps), inject: [Logger] },
+         {
+           provide: APP_FILTER,
+           useFactory: (...deps) => new CustomFilter(...deps),
+           inject: [Logger],
+         },
          { provide: APP_MIDDLEWARE, useClass: RequestTracingMiddleware },
        ],
      })
@@ -183,9 +193,9 @@ export class UserService implements OnModuleInit, OnModuleDestroy {
 - Middleware handlers participate in lifecycle hooks (`OnModuleInit`, `OnModuleDestroy`, etc.) just like other providers.
 
 ```ts
-import type { Context, Next } from 'hono'
-import { APP_MIDDLEWARE, Middleware } from '@tsuki/framework'
-import { injectable } from 'tsyringe'
+import type { Context, Next } from 'hono';
+import { APP_MIDDLEWARE, Middleware } from '@tsuki/framework';
+import { injectable } from 'tsyringe';
 
 // Logger, CacheService, and LegacyMiddleware are regular injectables.
 
@@ -195,12 +205,12 @@ class RequestTracingMiddleware {
   constructor(private readonly logger: Logger) {}
 
   async use(context: Context, next: Next) {
-    const start = Date.now()
-    await next()
+    const start = Date.now();
+    await next();
     this.logger.info('request', {
       path: context.req.path,
       durationMs: Date.now() - start,
-    })
+    });
   }
 }
 
@@ -213,8 +223,8 @@ class RequestTracingMiddleware {
       useFactory: (cache: CacheService) => ({
         handler: {
           async use(context: Context, next: Next) {
-            await next()
-            cache.touch(context.req.path)
+            await next();
+            cache.touch(context.req.path);
           },
         },
         path: '/static/*',
@@ -227,7 +237,7 @@ class RequestTracingMiddleware {
 export class AppModule {}
 
 // Or register imperatively after bootstrap
-app.useGlobalMiddlewares({ handler: new LegacyMiddleware(), path: '/legacy' })
+app.useGlobalMiddlewares({ handler: new LegacyMiddleware(), path: '/legacy' });
 ```
 
 ### Request Context HttpContext
@@ -239,11 +249,11 @@ app.useGlobalMiddlewares({ handler: new LegacyMiddleware(), path: '/legacy' })
 ```ts
 declare module '@tsuki/framework' {
   interface HttpContextValues {
-    userId?: string
+    userId?: string;
   }
 }
 
-HttpContext.assign({ userId: 'u_123' })
+HttpContext.assign({ userId: 'u_123' });
 ```
 
 ### Validation & DTOs
@@ -333,20 +343,20 @@ Providers implementing the following interfaces are automatically registered:
 `useGlobal*` methods accept instances created with `new` (not resolved from container). For middlewares, wrap the instance in a `MiddlewareDefinition`:
 
 ```ts
-const app = await createApplication(AppModule)
+const app = await createApplication(AppModule);
 
 // Pass instances created with 'new'
-app.useGlobalGuards(new AuthGuard())
-app.useGlobalPipes(new ValidationPipe())
-app.useGlobalInterceptors(new LoggingInterceptor())
-app.useGlobalFilters(new AllExceptionsFilter())
-app.useGlobalMiddlewares({ handler: new LegacyMiddleware(), path: '/*' })
+app.useGlobalGuards(new AuthGuard());
+app.useGlobalPipes(new ValidationPipe());
+app.useGlobalInterceptors(new LoggingInterceptor());
+app.useGlobalFilters(new AllExceptionsFilter());
+app.useGlobalMiddlewares({ handler: new LegacyMiddleware(), path: '/*' });
 ```
 
 **If your enhancer needs DI**, prefer using `APP_*` tokens in module providers instead:
 
 ```ts
-import { APP_GUARD, APP_INTERCEPTOR } from '@tsuki/framework'
+import { APP_GUARD, APP_INTERCEPTOR } from '@tsuki/framework';
 
 @Module({
   providers: [
@@ -362,8 +372,8 @@ export class AppModule {}
 - Recommended to use `vitest` (already configured in repository).
 - **Unit tests**: Leverage `tsyringe` container to inject mocks and directly resolve Service instances.
   ```ts
-  const container = app.getContainer()
-  const service = container.resolve(UserService)
+  const container = app.getContainer();
+  const service = container.resolve(UserService);
   ```
 - **Integration tests**: Call `createApplication()` to construct complete app, use `app.getInstance().request()` to make requests, testing interceptors, pipes, and filters.
 - **Event system**: Can be verified by replacing Redis Client (e.g., in-memory mock).

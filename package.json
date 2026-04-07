@@ -2,8 +2,29 @@
   "name": "tsuki",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@10.29.3",
   "scripts": {
+    "format": "prettier --write .",
+    "lint": "eslint . --fix",
+    "prepare": "simple-git-hooks",
     "test": "pnpm -r run test"
-  }
+  },
+  "simple-git-hooks": {
+    "pre-commit": "pnpm lint-staged"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx,mjs,cjs}": "eslint --fix",
+    "*": "prettier --write --ignore-unknown"
+  },
+  "devDependencies": {
+    "@lobehub/eslint-config": "^2.1.5",
+    "@lobehub/prettier-config": "^2.1.5",
+    "eslint": "^10.2.0",
+    "lint-staged": "^16.4.0",
+    "prettier": "^3.8.1",
+    "prettier-plugin-packagejson": "^3.0.2",
+    "prettier-plugin-sh": "^0.18.1",
+    "prettier-plugin-sort-json": "^4.2.0",
+    "simple-git-hooks": "^2.13.1"
+  },
+  "packageManager": "pnpm@10.29.3"
 }

@@ -84,18 +84,19 @@ Request → HttpContext.run() → Guards → Interceptors (pre) → Pipes → Ha
 
 ### Core Dependencies
 
-| Package | Role |
-|---------|------|
-| `hono` | HTTP routing and request handling |
-| `tsyringe` | Dependency injection container |
-| `reflect-metadata` | Decorator metadata reflection |
-| `zod` | Schema validation |
-| `picocolors` | Colored log output |
-| `ioredis` (peer) | Redis pub/sub for event system |
+| Package            | Role                              |
+| ------------------ | --------------------------------- |
+| `hono`             | HTTP routing and request handling |
+| `tsyringe`         | Dependency injection container    |
+| `reflect-metadata` | Decorator metadata reflection     |
+| `zod`              | Schema validation                 |
+| `picocolors`       | Colored log output                |
+| `ioredis` (peer)   | Redis pub/sub for event system    |
 
 ### Decorator-Driven Design
 
 Everything is declared via decorators:
+
 - `@Module({ imports, controllers, providers })` — organize features
 - `@Controller(prefix)` — HTTP endpoint groups
 - `@Get()`, `@Post()`, etc. — route handlers
