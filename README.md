@@ -1,10 +1,25 @@
 <div align="center">
 
-# Tsuki
+# 🌙 Tsuki
 
 A collection of TypeScript libraries for building enterprise-grade server applications.
 
 </div>
+
+## Why “Tsuki”
+
+**Hono** (_hi_, **火**, fire; the framework’s name plays on **炎**, _flame_) and **Tsuki** (_tsuki_, **月**, moon) mirror each other: **火 ↔ 月** — a fast, fiery edge runtime with a calm, reflective layer on top. [Hono](https://hono.dev) stays lean at HTTP; Tsuki adds modules, decorators, and DI without dulling that core.
+
+## Inspired by NestJS
+
+Tsuki borrows proven ideas from the [NestJS](https://nestjs.com) ecosystem so teams can reuse familiar mental models without committing to a full Nest stack on Hono:
+
+- **Modules & controllers** — `@Module`, `@Controller`, and route decorators for structure and discovery.
+- **Dependency injection** — constructor injection via [tsyringe](https://github.com/microsoft/tsyringe), with singleton providers and explicit registration.
+- **Cross-cutting concerns** — guards, pipes, interceptors, exception filters, and middleware hooks arranged in a predictable request pipeline.
+- **Metadata-driven behavior** — decorators carry OpenAPI and routing hints, similar to Nest’s decorator-first configuration style.
+
+NestJS remains the reference for many of these patterns; Tsuki adapts them for Hono-first apps that want the same ergonomics in a smaller footprint.
 
 ## Packages
 
