@@ -1074,9 +1074,15 @@ describe('HonoHttpApplication parameter factories', () => {
 
 describe('HonoHttpApplication internals', () => {
   it('throws descriptive errors when dependency resolution fails', async () => {
-    await expect(createApplication(BrokenModule)).rejects.toThrowError(
-      /cannot inject the dependency missing/i,
-    );
+    await expect(createApplication(BrokenModule)).rejects.toSatisfy((err) => {
+      expect(err).toBeInstanceOf(Error);
+      const message = (err as Error).message;
+      expect(message).toMatch(/failed to resolve provider brokencontroller/i);
+      expect(message).toMatch(/cannot inject the dependency missing/i);
+      expect(message).toMatch(/MissingService/);
+      expect(message).toMatch(/type-only import/i);
+      return true;
+    });
   });
 
   it('supports forwardRef module relationships without infinite recursion', async () => {
