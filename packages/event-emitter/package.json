@@ -33,7 +33,7 @@
   },
   "devDependencies": {
     "@types/node": "^25.2.3",
-    "hono": "4.11.9",
+    "hono": "4.12.12",
     "ioredis": "5.9.3",
     "unplugin-swc": "1.5.9",
     "vitest": "4.0.18"
