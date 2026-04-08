@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 
-import { createExecutionContext } from '@tsuki/core';
+import { createExecutionContext } from '@tsuki-hono/core';
 import type { Context } from 'hono';
 import { injectable } from 'tsyringe';
 import { describe, expect, it } from 'vitest';
@@ -50,7 +50,7 @@ import {
   ZodValidationPipe,
 } from '../src';
 
-declare module '@tsuki/common' {
+declare module '@tsuki-hono/common' {
   interface HttpContextValues {
     custom?: string;
   }

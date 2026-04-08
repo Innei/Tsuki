@@ -1,11 +1,11 @@
-# @tsuki/core
+# @tsuki-hono/core
 
 Application runtime for the Tsuki framework — bootstraps modules, registers routes, manages DI container and lifecycle hooks.
 
 ## Install
 
 ```bash
-pnpm add @tsuki/core
+pnpm add @tsuki-hono/core
 ```
 
 ## Quick Start
@@ -13,8 +13,8 @@ pnpm add @tsuki/core
 ```ts
 import 'reflect-metadata';
 import { serve } from '@hono/node-server';
-import { Module, Controller, Get } from '@tsuki/common';
-import { createApplication } from '@tsuki/core';
+import { Module, Controller, Get } from '@tsuki-hono/common';
+import { createApplication } from '@tsuki-hono/core';
 
 @Controller('hello')
 class HelloController {
@@ -63,7 +63,7 @@ const app = await createApplication(AppModule, {
 Global DI container reference — useful for accessing the container outside of DI-managed code (decorators, utilities).
 
 ```ts
-import { ContainerRef } from '@tsuki/core';
+import { ContainerRef } from '@tsuki-hono/core';
 
 // Set during bootstrap (automatic)
 ContainerRef.set(container);

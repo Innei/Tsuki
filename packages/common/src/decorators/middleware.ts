@@ -1,5 +1,5 @@
 import { MIDDLEWARE_METADATA } from '../constants';
-import type { MiddlewareMetadata } from '../interfaces';
+import type { Constructor, MiddlewareMetadata } from '../interfaces';
 
 export type MiddlewareDecoratorOptions = MiddlewareMetadata;
 
@@ -9,6 +9,8 @@ export function Middleware(options: MiddlewareDecoratorOptions = {}): ClassDecor
   };
 }
 
-export function getMiddlewareMetadata(target: (...args: any[]) => any): MiddlewareMetadata {
+export function getMiddlewareMetadata(
+  target: Constructor | ((...args: any[]) => any),
+): MiddlewareMetadata {
   return (Reflect.getMetadata(MIDDLEWARE_METADATA, target) as MiddlewareMetadata | undefined) ?? {};
 }

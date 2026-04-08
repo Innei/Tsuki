@@ -1,11 +1,11 @@
-# @tsuki/event-emitter
+# @tsuki-hono/event-emitter
 
 Redis pub/sub event system for the Tsuki framework — decorator-based event listeners and emitters with cross-process broadcasting.
 
 ## Install
 
 ```bash
-pnpm add @tsuki/event-emitter
+pnpm add @tsuki-hono/event-emitter
 ```
 
 Peer dependency: `ioredis >= 5.8.0`
@@ -15,8 +15,8 @@ Peer dependency: `ioredis >= 5.8.0`
 Import `EventModule.forRootAsync()` in your root module:
 
 ```ts
-import { Module } from '@tsuki/common';
-import { EventModule } from '@tsuki/event-emitter';
+import { Module } from '@tsuki-hono/common';
+import { EventModule } from '@tsuki-hono/event-emitter';
 import { RedisService } from './redis.service';
 
 @Module({
@@ -39,7 +39,7 @@ export class AppModule {}
 
 ```ts
 import { injectable } from 'tsyringe';
-import { OnEvent } from '@tsuki/event-emitter';
+import { OnEvent } from '@tsuki-hono/event-emitter';
 
 @injectable()
 export class NotificationListener {
@@ -60,7 +60,7 @@ export class NotificationListener {
 #### Decorator-based (automatic)
 
 ```ts
-import { EmitEvent } from '@tsuki/event-emitter';
+import { EmitEvent } from '@tsuki-hono/event-emitter';
 
 @injectable()
 export class UserService {
@@ -83,7 +83,7 @@ export class UserService {
 #### Manual
 
 ```ts
-import { EventEmitterService } from '@tsuki/event-emitter';
+import { EventEmitterService } from '@tsuki-hono/event-emitter';
 
 @injectable()
 export class OrderService {
@@ -101,7 +101,7 @@ export class OrderService {
 Augment the `Events` interface for full type safety:
 
 ```ts
-declare module '@tsuki/event-emitter' {
+declare module '@tsuki-hono/event-emitter' {
   interface Events {
     'user.created': { userId: string };
     'order.completed': { orderId: string; total: number };

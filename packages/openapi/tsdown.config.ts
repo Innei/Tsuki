@@ -6,6 +6,6 @@ export default defineConfig({
   dts: true,
   clean: true,
   deps: {
-    neverBundle: ['@tsuki/common'],
+    neverBundle: ['@tsuki-hono/common'],
   },
 });

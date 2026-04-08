@@ -3,8 +3,8 @@ import type {
   ExecutionContext,
   HttpArgumentsHost,
   HttpContextValues,
-} from '@tsuki/common';
-import { HttpContext } from '@tsuki/common';
+} from '@tsuki-hono/common';
+import { HttpContext } from '@tsuki-hono/common';
 import type { DependencyContainer } from 'tsyringe';
 
 class HttpArgumentsHostImpl implements HttpArgumentsHost {

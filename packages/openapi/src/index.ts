@@ -1,5 +1,5 @@
 /* c8 ignore file */
-import type { Constructor, RouteParamMetadataItem } from '@tsuki/common';
+import type { Constructor, RouteParamMetadataItem } from '@tsuki-hono/common';
 import {
   getApiDoc,
   getApiTags,
@@ -10,8 +10,8 @@ import {
   getZodSchema,
   resolveModuleImports,
   RouteParamtypes,
-} from '@tsuki/common';
-import type { ZodTypeAny } from 'zod';
+} from '@tsuki-hono/common';
+import type { ZodType } from 'zod';
 import {
   ZodArray,
   ZodBoolean,
@@ -570,7 +570,7 @@ function getSchemaName(constructor: Constructor): string {
   return constructor.name && constructor.name.length > 0 ? constructor.name : 'AnonymousSchema';
 }
 
-function convertZodSchema(schema: ZodTypeAny): SchemaConversionResult {
+function convertZodSchema(schema: ZodType): SchemaConversionResult {
   const { inner, optional, nullable } = unwrapSchema(schema);
   const converted = mapZodType(inner);
 
@@ -584,14 +584,14 @@ function convertZodSchema(schema: ZodTypeAny): SchemaConversionResult {
   };
 }
 
-function getDefinition(schema: ZodTypeAny): Record<string, any> {
+function getDefinition(schema: ZodType): Record<string, any> {
   if (!schema) {
     return {};
   }
 
-  const direct = Reflect.get(schema as object, '_def');
-  if (direct && typeof direct === 'object') {
-    return direct as Record<string, any>;
+  const publicDef = (schema as { def?: unknown }).def;
+  if (publicDef && typeof publicDef === 'object') {
+    return publicDef as Record<string, any>;
   }
 
   const internal = Reflect.get(schema as object, '_zod');
@@ -602,15 +602,20 @@ function getDefinition(schema: ZodTypeAny): Record<string, any> {
     }
   }
 
+  const legacy = Reflect.get(schema as object, '_def');
+  if (legacy && typeof legacy === 'object') {
+    return legacy as Record<string, any>;
+  }
+
   return {};
 }
 
-function getTypeName(schema: ZodTypeAny): string | undefined {
+function getTypeName(schema: ZodType): string | undefined {
   const def = getDefinition(schema);
   return def.typeName ?? def.type ?? schema.constructor?.name;
 }
 
-function getInnerSchemaFromDef(def: Record<string, any>): ZodTypeAny | undefined {
+function getInnerSchemaFromDef(def: Record<string, any>): ZodType | undefined {
   if (!def || typeof def !== 'object') {
     return undefined;
   }
@@ -626,10 +631,10 @@ function getInnerSchemaFromDef(def: Record<string, any>): ZodTypeAny | undefined
     def.rest ??
     def.catchall ??
     def.shape ??
-    def.output) as ZodTypeAny | undefined;
+    def.output) as ZodType | undefined;
 }
 
-function getInnerSchema(schema: ZodTypeAny): ZodTypeAny | undefined {
+function getInnerSchema(schema: ZodType): ZodType | undefined {
   const def = getDefinition(schema);
   const inner = getInnerSchemaFromDef(def);
   if (inner) {
@@ -643,8 +648,8 @@ function getInnerSchema(schema: ZodTypeAny): ZodTypeAny | undefined {
   return undefined;
 }
 
-function unwrapSchema(schema: ZodTypeAny): {
-  inner: ZodTypeAny;
+function unwrapSchema(schema: ZodType): {
+  inner: ZodType;
   optional: boolean;
   nullable: boolean;
 } {
@@ -684,7 +689,7 @@ function unwrapSchema(schema: ZodTypeAny): {
   return { inner: current, optional, nullable };
 }
 
-function mapZodType(schema: ZodTypeAny): SchemaConversionResult {
+function mapZodType(schema: ZodType): SchemaConversionResult {
   const typeName = getTypeName(schema);
 
   if (schema instanceof ZodString) {
@@ -709,14 +714,14 @@ function mapZodType(schema: ZodTypeAny): SchemaConversionResult {
   }
 
   if (schema instanceof ZodArray) {
-    const elementSchema: ZodTypeAny | undefined =
+    const elementSchema: ZodType | undefined =
       (schema as any).element ??
       (typeof (schema as any).unwrap === 'function' ? (schema as any).unwrap() : undefined) ??
       getInnerSchemaFromDef(getDefinition(schema)) ??
       getDefinition(schema).type;
 
     const element = elementSchema
-      ? convertZodSchema(elementSchema as ZodTypeAny)
+      ? convertZodSchema(elementSchema as ZodType)
       : { schema: { type: 'string' }, optional: false };
     return {
       schema: {
@@ -737,8 +742,8 @@ function mapZodType(schema: ZodTypeAny): SchemaConversionResult {
   if (schema instanceof ZodUnion) {
     const unionOptions = ((schema as any).options ??
       getDefinition(schema).options ??
-      []) as ZodTypeAny[];
-    const options = unionOptions.map((option) => convertZodSchema(option as ZodTypeAny).schema);
+      []) as ZodType[];
+    const options = unionOptions.map((option) => convertZodSchema(option as ZodType).schema);
     return {
       schema: { oneOf: options },
       optional: false,
@@ -773,7 +778,7 @@ function mapZodType(schema: ZodTypeAny): SchemaConversionResult {
 
   if (schema instanceof ZodRecord) {
     const valueSchema = ((schema as any).valueSchema ?? getDefinition(schema).valueType) as
-      | ZodTypeAny
+      | ZodType
       | undefined;
     const valueType = valueSchema ? convertZodSchema(valueSchema).schema : { type: 'string' };
     return {
@@ -881,8 +886,8 @@ function buildObjectSchema(schema: ZodObject<any>): Record<string, unknown> {
   const properties: Record<string, unknown> = {};
   const required: string[] = [];
 
-  for (const [key, value] of Object.entries(shape as Record<string, ZodTypeAny>)) {
-    const converted = convertZodSchema(value as ZodTypeAny);
+  for (const [key, value] of Object.entries(shape as Record<string, ZodType>)) {
+    const converted = convertZodSchema(value as ZodType);
     properties[key] = converted.schema;
     if (!converted.optional) {
       required.push(key);
@@ -900,7 +905,7 @@ function buildObjectSchema(schema: ZodObject<any>): Record<string, unknown> {
 
   const { catchall } = def;
   if (catchall && !(catchall instanceof ZodNever)) {
-    result.additionalProperties = convertZodSchema(catchall as ZodTypeAny).schema;
+    result.additionalProperties = convertZodSchema(catchall as ZodType).schema;
   }
 
   return result;

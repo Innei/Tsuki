@@ -1,11 +1,11 @@
-# @tsuki/common
+# @tsuki-hono/common
 
 Shared building blocks for the Tsuki framework — decorators, interfaces, exceptions, validation pipes, logger, and request context.
 
 ## Install
 
 ```bash
-pnpm add @tsuki/common
+pnpm add @tsuki-hono/common
 ```
 
 Peer dependency: `hono >= 4.0.0`
@@ -41,7 +41,7 @@ import {
   ApiDoc, // OpenAPI metadata
   ZodSchema, // Zod schema binding
   applyDecorators, // Compose decorators
-} from '@tsuki/common';
+} from '@tsuki-hono/common';
 ```
 
 ### Request Context
@@ -49,14 +49,14 @@ import {
 AsyncLocalStorage-based, request-scoped context — accessible from anywhere in the call stack.
 
 ```ts
-import { HttpContext } from '@tsuki/common';
+import { HttpContext } from '@tsuki-hono/common';
 
 // Read
 const ctx = HttpContext.getValue('hono');
 const path = ctx.req.path;
 
 // Write (extend via module augmentation)
-declare module '@tsuki/common' {
+declare module '@tsuki-hono/common' {
   interface HttpContextValues {
     userId?: string;
   }
@@ -74,7 +74,7 @@ import {
   ForbiddenException,
   NotFoundException,
   InternalServerErrorException,
-} from '@tsuki/common';
+} from '@tsuki-hono/common';
 
 throw new NotFoundException();
 throw new BadRequestException({ message: 'Invalid input' });
@@ -84,7 +84,7 @@ throw new BadRequestException({ message: 'Invalid input' });
 
 ```ts
 import { z } from 'zod';
-import { createZodSchemaDto, createZodValidationPipe, ZodValidationPipe } from '@tsuki/common';
+import { createZodSchemaDto, createZodValidationPipe, ZodValidationPipe } from '@tsuki-hono/common';
 
 const CreateUserSchema = z.object({
   email: z.string().email(),
@@ -102,7 +102,7 @@ create(@Body() dto: CreateUserDto) {
 ### Logger
 
 ```ts
-import { createLogger } from '@tsuki/common';
+import { createLogger } from '@tsuki-hono/common';
 
 const logger = createLogger('MyService');
 logger.info('Hello');
@@ -127,7 +127,13 @@ All type definitions for the framework contract:
 Metadata symbols and global enhancer tokens:
 
 ```ts
-import { APP_GUARD, APP_PIPE, APP_INTERCEPTOR, APP_FILTER, APP_MIDDLEWARE } from '@tsuki/common';
+import {
+  APP_GUARD,
+  APP_PIPE,
+  APP_INTERCEPTOR,
+  APP_FILTER,
+  APP_MIDDLEWARE,
+} from '@tsuki-hono/common';
 ```
 
 ## License

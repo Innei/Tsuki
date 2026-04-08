@@ -1,6 +1,6 @@
 {
-  "name": "@tsuki/common",
-  "version": "0.1.0",
+  "name": "@tsuki-hono/common",
+  "version": "0.0.2",
   "description": "Shared decorators, interfaces, exceptions, pipes, logger, and context for Tsuki framework",
   "repository": {
     "type": "git",
@@ -32,8 +32,8 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@tsuki/core": "workspace:*",
-    "@types/node": "^25.2.3",
+    "@tsuki-hono/core": "workspace:*",
+    "@types/node": "^25.5.2",
     "hono": "4.11.9",
     "unplugin-swc": "1.5.9",
     "vitest": "4.0.18"
@@ -45,11 +45,11 @@
     "access": "public",
     "exports": {
       ".": {
-        "types": "./dist/index.d.ts",
-        "import": "./dist/index.js"
+        "types": "./dist/index.d.mts",
+        "import": "./dist/index.mjs"
       }
     },
-    "main": "./dist/index.js",
-    "types": "./dist/index.d.ts"
+    "main": "./dist/index.mjs",
+    "types": "./dist/index.d.mts"
   }
 }

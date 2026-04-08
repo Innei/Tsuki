@@ -4,14 +4,14 @@ import type {
   ExceptionFilter,
   Interceptor,
   PipeTransform,
-} from '@tsuki/common';
+} from '@tsuki-hono/common';
 import {
   EXCEPTION_FILTERS_METADATA,
   getEnhancerMetadata,
   GUARDS_METADATA,
   INTERCEPTORS_METADATA,
   PIPES_METADATA,
-} from '@tsuki/common';
+} from '@tsuki-hono/common';
 
 function collectEnhancers<T>(
   metadataKey: symbol,

@@ -1,6 +1,6 @@
 {
-  "name": "@tsuki/event-emitter",
-  "version": "0.1.0",
+  "name": "@tsuki-hono/event-emitter",
+  "version": "0.0.2",
   "description": "Redis pub/sub event system for Tsuki framework",
   "repository": {
     "type": "git",
@@ -26,13 +26,13 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@tsuki/common": "workspace:*",
-    "@tsuki/core": "workspace:*",
+    "@tsuki-hono/common": "workspace:*",
+    "@tsuki-hono/core": "workspace:*",
     "reflect-metadata": "0.2.2",
     "tsyringe": "4.10.0"
   },
   "devDependencies": {
-    "@types/node": "^25.2.3",
+    "@types/node": "^25.5.2",
     "hono": "4.11.9",
     "ioredis": "5.9.3",
     "unplugin-swc": "1.5.9",
@@ -45,11 +45,11 @@
     "access": "public",
     "exports": {
       ".": {
-        "types": "./dist/index.d.ts",
-        "import": "./dist/index.js"
+        "types": "./dist/index.d.mts",
+        "import": "./dist/index.mjs"
       }
     },
-    "main": "./dist/index.js",
-    "types": "./dist/index.d.ts"
+    "main": "./dist/index.mjs",
+    "types": "./dist/index.d.mts"
   }
 }

@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 
 import { injectable } from 'tsyringe';
-import type { ZodError, ZodTypeAny } from 'zod';
+import type { ZodError, ZodType } from 'zod';
 import { z } from 'zod';
 
 import { HttpException } from '../http-exception';
@@ -47,7 +47,7 @@ function isPrimitive(metatype?: Constructor): boolean {
   return PRIMITIVE_METATYPES.includes(metatype);
 }
 
-export function registerZodSchema(target: Constructor, schema: ZodTypeAny): void {
+export function registerZodSchema(target: Constructor, schema: ZodType): void {
   Reflect.defineMetadata(ZOD_SCHEMA_METADATA, schema, target);
   Object.defineProperty(target, 'schema', {
     value: schema,
@@ -57,18 +57,18 @@ export function registerZodSchema(target: Constructor, schema: ZodTypeAny): void
   });
 }
 
-export function getZodSchema(target?: Constructor): ZodTypeAny | undefined {
+export function getZodSchema(target?: Constructor): ZodType | undefined {
   if (!target || !isConstructor(target)) {
     return undefined;
   }
 
   return (
-    (Reflect.getMetadata(ZOD_SCHEMA_METADATA, target) as ZodTypeAny | undefined) ??
-    (target as unknown as { schema?: ZodTypeAny }).schema
+    (Reflect.getMetadata(ZOD_SCHEMA_METADATA, target) as ZodType | undefined) ??
+    (target as unknown as { schema?: ZodType }).schema
   );
 }
 
-export function ZodSchema(schema: ZodTypeAny): ClassDecorator {
+export function ZodSchema(schema: ZodType): ClassDecorator {
   return (target) => {
     if (isConstructor(target)) {
       registerZodSchema(target, schema);
@@ -80,13 +80,13 @@ interface BuildZodSchemaDtoOptions {
   name?: string;
 }
 
-function buildZodSchemaDto<TSchema extends ZodTypeAny>(
+function buildZodSchemaDto<TSchema extends ZodType>(
   schema: TSchema,
   options: BuildZodSchemaDtoOptions,
-): Constructor<z.infer<TSchema>> {
+): Constructor<z.output<TSchema>> {
   @ZodSchema(schema)
   class ZodSchemaDto {
-    constructor(initial?: z.infer<TSchema>) {
+    constructor(initial?: z.output<TSchema>) {
       if (initial && typeof initial === 'object') {
         Object.assign(this, initial);
       }
@@ -101,7 +101,7 @@ function buildZodSchemaDto<TSchema extends ZodTypeAny>(
     configurable: true,
   });
 
-  return ZodSchemaDto as unknown as Constructor<z.infer<TSchema>>;
+  return ZodSchemaDto as unknown as Constructor<z.output<TSchema>>;
 }
 
 export interface CreateZodSchemaDtoOptions {
@@ -109,16 +109,16 @@ export interface CreateZodSchemaDtoOptions {
   name?: string;
 }
 
-export function createZodSchemaDto<TSchema extends ZodTypeAny>(
+export function createZodSchemaDto<TSchema extends ZodType>(
   schema: TSchema,
   options: CreateZodSchemaDtoOptions = {},
-): Constructor<z.infer<TSchema>> {
+): Constructor<z.output<TSchema>> {
   return buildZodSchemaDto(schema, options);
 }
 
-export function createZodDto<TSchema extends ZodTypeAny>(
+export function createZodDto<TSchema extends ZodType>(
   schema: TSchema,
-): Constructor<z.infer<TSchema>> {
+): Constructor<z.output<TSchema>> {
   return buildZodSchemaDto(schema, {});
 }
 
@@ -177,7 +177,7 @@ export class ZodValidationPipe implements PipeTransform<unknown> {
     return value === null || typeof value !== 'object' || Array.isArray(value);
   }
 
-  private relaxSchema(schema: ZodTypeAny): ZodTypeAny {
+  private relaxSchema(schema: ZodType): ZodType {
     if (schema instanceof z.ZodObject) {
       return schema.passthrough();
     }

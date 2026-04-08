@@ -1,8 +1,8 @@
 import 'reflect-metadata';
 
-import type { Constructor } from '@tsuki/common';
-import { getModuleMetadata, Module } from '@tsuki/common';
-import { ContainerRef, createApplication } from '@tsuki/core';
+import type { Constructor } from '@tsuki-hono/common';
+import { getModuleMetadata, Module } from '@tsuki-hono/common';
+import { ContainerRef, createApplication } from '@tsuki-hono/core';
 import { injectable } from 'tsyringe';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -380,7 +380,7 @@ describe('Redis Event System', () => {
 
   it('uses selector option for async emit decorator results', async () => {
     const emitter = {
-      emit: vi.fn().mockResolvedValue(),
+      emit: vi.fn().mockResolvedValue(undefined),
     };
 
     ContainerRef.set({
@@ -415,7 +415,7 @@ describe('Redis Event System', () => {
 
   it('uses selector option for sync emit decorator results', async () => {
     const emitter = {
-      emit: vi.fn().mockResolvedValue(),
+      emit: vi.fn().mockResolvedValue(undefined),
     };
 
     ContainerRef.set({
@@ -724,8 +724,8 @@ describe('Redis Event System', () => {
   it('guards repeated lifecycle calls in EventModule bootstrapper', async () => {
     const redis = new FakeRedis();
     const emitter = {
-      start: vi.fn().mockResolvedValue(),
-      stop: vi.fn().mockResolvedValue(),
+      start: vi.fn().mockResolvedValue(undefined),
+      stop: vi.fn().mockResolvedValue(undefined),
     };
 
     const DynamicModule = EventModule.forRootAsync({

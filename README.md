@@ -8,12 +8,12 @@ A collection of TypeScript libraries for building enterprise-grade server applic
 
 ## Packages
 
-| Package                                            | Description                                                            |
-| -------------------------------------------------- | ---------------------------------------------------------------------- |
-| [`@tsuki/common`](./packages/common)               | Decorators, interfaces, exceptions, pipes, logger, and request context |
-| [`@tsuki/core`](./packages/core)                   | Application runtime, DI container utils, route registration            |
-| [`@tsuki/event-emitter`](./packages/event-emitter) | Redis pub/sub event system with `@OnEvent` / `@EmitEvent`              |
-| [`@tsuki/openapi`](./packages/openapi)             | OpenAPI 3.1 document generation from decorator metadata                |
+| Package                                                 | Description                                                            |
+| ------------------------------------------------------- | ---------------------------------------------------------------------- |
+| [`@tsuki-hono/common`](./packages/common)               | Decorators, interfaces, exceptions, pipes, logger, and request context |
+| [`@tsuki-hono/core`](./packages/core)                   | Application runtime, DI container utils, route registration            |
+| [`@tsuki-hono/event-emitter`](./packages/event-emitter) | Redis pub/sub event system with `@OnEvent` / `@EmitEvent`              |
+| [`@tsuki-hono/openapi`](./packages/openapi)             | OpenAPI 3.1 document generation from decorator metadata                |
 
 ## Quick Start
 
@@ -34,8 +34,8 @@ pnpm test
 ```ts
 import 'reflect-metadata';
 import { serve } from '@hono/node-server';
-import { Module, Controller, Get } from '@tsuki/common';
-import { createApplication } from '@tsuki/core';
+import { Module, Controller, Get } from '@tsuki-hono/common';
+import { createApplication } from '@tsuki-hono/core';
 
 @Controller('hello')
 class HelloController {

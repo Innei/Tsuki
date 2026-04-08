@@ -22,7 +22,7 @@ import type {
   PipeTransform,
   PrettyLogger,
   RouteParamMetadataItem,
-} from '@tsuki/common';
+} from '@tsuki-hono/common';
 import {
   APP_FILTER,
   APP_GUARD,
@@ -44,7 +44,7 @@ import {
   isDebugEnabled,
   resolveModuleImports,
   RouteParamtypes,
-} from '@tsuki/common';
+} from '@tsuki-hono/common';
 import type { Context, Next } from 'hono';
 import { Hono } from 'hono';
 import colors from 'picocolors';

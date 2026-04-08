@@ -7,7 +7,7 @@ import {
   resetContainerRef,
   runWithContainer,
   setContainerRef,
-} from '@tsuki/core';
+} from '@tsuki-hono/core';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 type TestContainer = {

@@ -1,6 +1,6 @@
-import type { Constructor, OnModuleDestroy, OnModuleInit } from '@tsuki/common';
-import { createLogger, Module } from '@tsuki/common';
-import { ContainerRef } from '@tsuki/core';
+import type { Constructor, OnModuleDestroy, OnModuleInit } from '@tsuki-hono/common';
+import { createLogger, Module } from '@tsuki-hono/common';
+import { ContainerRef } from '@tsuki-hono/core';
 import { injectable } from 'tsyringe';
 
 const logger = createLogger('Events:EmitDecorator');

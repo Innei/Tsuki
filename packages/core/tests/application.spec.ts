@@ -21,7 +21,7 @@ import type {
   OnModuleInit,
   PipeTransform,
   RouteParamMetadataItem,
-} from '@tsuki/common';
+} from '@tsuki-hono/common';
 import {
   APP_FILTER,
   APP_GUARD,
@@ -51,8 +51,8 @@ import {
   UseInterceptors,
   ZodSchema,
   ZodValidationPipe,
-} from '@tsuki/common';
-import { createApplication, HonoHttpApplication } from '@tsuki/core';
+} from '@tsuki-hono/common';
+import { createApplication, HonoHttpApplication } from '@tsuki-hono/core';
 import type { Context, Next } from 'hono';
 import { injectable } from 'tsyringe';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -62,7 +62,7 @@ const BASE_URL = 'http://localhost';
 
 const GENERATED_RESPONSE = Symbol.for('hono.framework.generatedResponse');
 
-declare module '@tsuki/common' {
+declare module '@tsuki-hono/common' {
   interface HttpContextValues {
     auth?: {
       apiKey?: string;

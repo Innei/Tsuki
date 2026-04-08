@@ -1,17 +1,17 @@
-# @tsuki/openapi
+# @tsuki-hono/openapi
 
 OpenAPI 3.1 document generation for the Tsuki framework — automatically builds specs from module, controller, and decorator metadata.
 
 ## Install
 
 ```bash
-pnpm add @tsuki/openapi
+pnpm add @tsuki-hono/openapi
 ```
 
 ## Usage
 
 ```ts
-import { createOpenApiDocument } from '@tsuki/openapi';
+import { createOpenApiDocument } from '@tsuki-hono/openapi';
 import { AppModule } from './app.module';
 
 const doc = createOpenApiDocument(AppModule, {
@@ -47,7 +47,7 @@ The generator traverses the module graph and collects:
 ## Annotating Your API
 
 ```ts
-import { Controller, Get, Post, Body, Param, ApiTags, ApiDoc } from '@tsuki/common';
+import { Controller, Get, Post, Body, Param, ApiTags, ApiDoc } from '@tsuki-hono/common';
 
 @ApiTags('Users')
 @Controller('users')

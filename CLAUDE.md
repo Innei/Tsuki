@@ -1,80 +1,43 @@
-# Tsuki Framework - Development Guide
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
 
-Tsuki is a monorepo containing `@tsuki/framework` — a lightweight yet feature-complete enterprise web framework built on [Hono](https://hono.dev), providing NestJS-like modularity, decorators, and dependency injection while retaining Hono's performance and flexibility.
+Tsuki is a monorepo of TypeScript libraries for building enterprise web applications on [Hono](https://hono.dev), with NestJS-like decorators and dependency injection via tsyringe.
 
-## Repository Structure
+## Packages
 
-```
-tsuki/
-├── packages/
-│   └── framework/          # @tsuki/framework - Core web framework
-│       ├── src/
-│       │   ├── application.ts          # HonoHttpApplication, createApplication()
-│       │   ├── constants.ts            # Metadata symbols, APP_* tokens
-│       │   ├── http-exception.ts       # HttpException and common exceptions
-│       │   ├── index.ts                # Public API exports
-│       │   ├── context/
-│       │   │   └── http-context.ts     # AsyncLocalStorage request context
-│       │   ├── decorators/
-│       │   │   ├── apply-decorators.ts # Compose decorators
-│       │   │   ├── controller.ts       # @Controller()
-│       │   │   ├── enhancers.ts        # @UseGuards, @UsePipes, etc.
-│       │   │   ├── http-methods.ts     # @Get, @Post, @Put, etc.
-│       │   │   ├── middleware.ts        # @Middleware()
-│       │   │   ├── module.ts           # @Module(), forwardRef()
-│       │   │   ├── openapi.ts          # @ApiTags, @ApiDoc
-│       │   │   └── params.ts           # @Body, @Query, @Param, etc.
-│       │   ├── events/
-│       │   │   └── index.ts            # @OnEvent, @EmitEvent, EventModule
-│       │   ├── interfaces/
-│       │   │   └── index.ts            # All type definitions
-│       │   ├── logger/
-│       │   │   └── logger.ts           # PrettyLogger
-│       │   ├── openapi/
-│       │   │   └── generator.ts        # OpenAPI 3.1 document generation
-│       │   ├── pipes/
-│       │   │   └── zod-validation.pipe.ts  # ZodValidationPipe, createZodDto
-│       │   └── utils/
-│       │       ├── container-ref.ts    # Global DI container reference
-│       │       ├── execution-context.ts # ExecutionContext implementation
-│       │       └── metadata.ts         # Metadata collection helpers
-│       └── tests/                      # 121 tests, 100% coverage
-├── package.json              # Monorepo root
-└── pnpm-workspace.yaml       # Workspace config
-```
+| Package                     | Description                                                                 | Dependencies                                                        |
+| --------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `@tsuki-hono/common`        | Decorators, interfaces, exceptions, pipes, logger, HTTP context             | tsyringe, reflect-metadata, zod                                     |
+| `@tsuki-hono/core`          | Application runtime (`createApplication`), DI container, route registration | depends on `@tsuki-hono/common`, hono                               |
+| `@tsuki-hono/event-emitter` | Redis pub/sub event system (`@OnEvent`, `@EmitEvent`, `EventModule`)        | depends on `@tsuki-hono/common` + `@tsuki-hono/core`, peer: ioredis |
+| `@tsuki-hono/openapi`       | OpenAPI 3.1 doc generation from decorator metadata                          | depends on `@tsuki-hono/common`, zod                                |
 
-## Tech Stack
-
-- **Runtime**: Node.js with TypeScript (ESNext)
-- **Package Manager**: pnpm 10.x with workspaces
-- **HTTP**: Hono 4.x
-- **DI**: tsyringe (reflect-metadata)
-- **Validation**: Zod 4.x
-- **Test**: Vitest with 100% coverage thresholds
-- **Build**: SWC via unplugin-swc
+Dependency graph: `common` ← `core` ← `event-emitter`; `common` ← `openapi`.
 
 ## Development Commands
 
 ```bash
-# Install dependencies
-pnpm install
+pnpm install   # Install all dependencies
+pnpm test      # Run all tests across packages
+pnpm build     # Build all packages (tsdown)
+pnpm typecheck # Typecheck all packages
 
-# Run all tests
-pnpm test
+# Per-package
+cd packages/core && pnpm test       # Run tests for one package
+cd packages/core && pnpm test:watch # Watch mode
+npx vitest run tests/foo.test.ts    # Run a single test file (from package dir)
 
-# Run framework tests
-cd packages/framework && pnpm test
-
-# Run tests with coverage
-cd packages/framework && pnpm test:coverage
-
-# Watch mode
-cd packages/framework && pnpm test:watch
+# Linting
+pnpm lint   # ESLint with auto-fix (lobehub config)
+pnpm format # Prettier
 ```
 
-## Key Architecture Concepts
+Pre-commit hook runs lint-staged (eslint + prettier on changed files) via simple-git-hooks.
+
+## Architecture
 
 ### Request Execution Flow
 
@@ -82,58 +45,35 @@ cd packages/framework && pnpm test:watch
 Request → HttpContext.run() → Guards → Interceptors (pre) → Pipes → Handler → Interceptors (post) → Exception Filters (on error) → Response
 ```
 
-### Core Dependencies
+### Key Patterns
 
-| Package            | Role                              |
-| ------------------ | --------------------------------- |
-| `hono`             | HTTP routing and request handling |
-| `tsyringe`         | Dependency injection container    |
-| `reflect-metadata` | Decorator metadata reflection     |
-| `zod`              | Schema validation                 |
-| `picocolors`       | Colored log output                |
-| `ioredis` (peer)   | Redis pub/sub for event system    |
+- **Decorator-driven**: `@Module`, `@Controller`, `@Get`/`@Post`/etc., `@Body`/`@Query`/`@Param`, `@UseGuards`/`@UsePipes`/`@UseInterceptors`/`@UseFilters`, `@Middleware`
+- **DI via tsyringe**: singleton by default, strict mode (unregistered tokens throw `ReferenceError`). Providers support `useClass`, `useValue`, `useExisting`, `useFactory`
+- **Global enhancers**: `APP_GUARD`, `APP_PIPE`, `APP_INTERCEPTOR`, `APP_FILTER`, `APP_MIDDLEWARE` tokens
+- **HttpContext**: AsyncLocalStorage-based, request-scoped only — not available at startup
 
-### Decorator-Driven Design
+### Critical Rules
 
-Everything is declared via decorators:
+1. **Value imports for DI** — `import { Service }` not `import type { Service }` (tsyringe needs the runtime reference)
+2. **`reflect-metadata` imported first** — `@tsuki-hono/common/src/index.ts` handles this; ensure it's loaded before decorators
+3. **`emitDecoratorMetadata` + `experimentalDecorators`** must be enabled in tsconfig
+4. **Controllers need `@Controller()`**, services need `@injectable()`
+5. **Return plain objects** from handlers — framework serializes to Response
 
-- `@Module({ imports, controllers, providers })` — organize features
-- `@Controller(prefix)` — HTTP endpoint groups
-- `@Get()`, `@Post()`, etc. — route handlers
-- `@Body()`, `@Query()`, `@Param()` — parameter injection
-- `@UseGuards()`, `@UsePipes()`, `@UseInterceptors()`, `@UseFilters()` — enhancers
-- `@Middleware({ path, priority })` — HTTP middleware
+## Testing
 
-### Dependency Injection
+- Vitest + SWC (via unplugin-swc), `maxConcurrency: 1` per config
+- `vitest.setup.ts` in each package imports `reflect-metadata`
+- Integration tests: `createApplication(Module)` → `app.getInstance().request(path)` → assert response
+- Clean up: `await app.close()` in afterEach
+- `@tsuki-hono/openapi` has no tests currently
 
-- Container is based on `tsyringe` with strict mode (unregistered tokens throw `ReferenceError`)
-- Providers default to singleton
-- Support for `useClass`, `useValue`, `useExisting`, `useFactory`
-- Global enhancers via `APP_GUARD`, `APP_PIPE`, `APP_INTERCEPTOR`, `APP_FILTER`, `APP_MIDDLEWARE` tokens
-- Classes in enhancer decorators are auto-registered as singletons on first use
+## Tech Stack
 
-### Important Rules
-
-1. **Always use value imports, not type imports** for DI — `import { Service }` not `import type { Service }`
-2. **`reflect-metadata` must be imported first** before any decorator usage
-3. **`emitDecoratorMetadata` and `experimentalDecorators`** must be enabled in tsconfig
-4. **Controllers must have `@Controller()` decorator** and services must have `@injectable()`
-5. **Return plain objects** from handlers — framework handles Response serialization
-6. **HttpContext is request-scoped** — only available within request handlers, not in startup code
-
-## Testing Guidelines
-
-- Tests use Vitest with SWC for fast compilation
-- Coverage thresholds: 100% statements, branches, functions, lines (excluding OpenAPI generator)
-- `vitest.setup.ts` imports `reflect-metadata` globally
-- Use `createApplication(Module)` for integration tests
-- Use `app.getInstance().request(path)` to test routes
-- Clean up with `await app.close()` in afterEach
-
-## Code Style
-
-- TypeScript strict mode
-- ESNext target with ESModule resolution
-- No semicolons or trailing commas enforcement — follow existing patterns
-- Prefer `async/await` over raw Promises
-- Use `interface` for contracts, `type` for unions/intersections
+- **Runtime**: Node.js, TypeScript 6.x (ESNext/ESModule)
+- **Package Manager**: pnpm 10.x with workspaces
+- **Build**: tsdown
+- **HTTP**: Hono 4.x
+- **DI**: tsyringe + reflect-metadata
+- **Validation**: Zod 4.x
+- **Lint**: ESLint (lobehub config) + Prettier (lobehub config)
