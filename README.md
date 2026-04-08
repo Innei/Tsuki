@@ -30,6 +30,12 @@ NestJS remains the reference for many of these patterns; Tsuki adapts them for H
 | [`@tsuki-hono/event-emitter`](./packages/event-emitter) | Redis pub/sub event system with `@OnEvent` / `@EmitEvent`              |
 | [`@tsuki-hono/openapi`](./packages/openapi)             | OpenAPI 3.1 document generation from decorator metadata                |
 
+## Built with Tsuki
+
+Projects that ship on this stack:
+
+- **[Afilmory](https://github.com/Afilmory/afilmory)** — a personal photography site with a nostalgic, film-inspired presentation layer and a Tsuki/Hono backend.
+
 ## Quick Start
 
 ```bash
