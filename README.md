@@ -79,6 +79,12 @@ bootstrap();
 
 See individual package READMEs for detailed documentation.
 
+## AI assistants and agents
+
+Automated tools work best when they share the same constraints as the framework. **[`LLM.txt`](./LLM.txt)** is the repo’s agent-oriented guide: package graph, request pipeline, bootstrap steps, DI and TypeScript rules that are easy to get wrong, and how to run tests and typecheck before claiming a change is done. Point your coding agent at that file (or paste it into context) when implementing features in Tsuki or when building an app on `@tsuki-hono/*`.
+
+[Claude Code](https://claude.ai/code) users also have **[`CLAUDE.md`](./CLAUDE.md)** at the repo root with overlapping maintainer-focused notes.
+
 ## Development
 
 - **Package Manager**: pnpm 10.x
