@@ -1076,9 +1076,11 @@ describe('HonoHttpApplication internals', () => {
   it('throws descriptive errors when dependency resolution fails', async () => {
     await expect(createApplication(BrokenModule)).rejects.toSatisfy((err) => {
       expect(err).toBeInstanceOf(Error);
-      const message = (err as Error).message;
+      const esc = String.fromCharCode(0x1B);
+      const message = (err as Error).message.replaceAll(new RegExp(`${esc}\\[[0-9;]*m`, 'g'), '');
       expect(message).toMatch(/failed to resolve provider brokencontroller/i);
-      expect(message).toMatch(/cannot inject the dependency missing/i);
+      // Tsyringe quotes the parameter name; keep the rest of the line in scope for the word "missing".
+      expect(message).toMatch(/cannot inject the dependency [^\n]*\bmissing\b/i);
       expect(message).toMatch(/MissingService/);
       expect(message).toMatch(/type-only import/i);
       return true;
