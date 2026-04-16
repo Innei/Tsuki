@@ -27,7 +27,7 @@
   },
   "dependencies": {
     "@tsuki-hono/common": "workspace:*",
-    "hono": "4.12.12",
+    "hono": "4.12.14",
     "picocolors": "1.1.1",
     "reflect-metadata": "0.2.2",
     "tsyringe": "4.10.0"
