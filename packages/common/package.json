@@ -34,7 +34,7 @@
   "devDependencies": {
     "@tsuki-hono/core": "workspace:*",
     "@types/node": "^25.5.2",
-    "hono": "4.12.12",
+    "hono": "4.12.14",
     "unplugin-swc": "1.5.9",
     "vitest": "4.1.3"
   },
