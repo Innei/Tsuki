@@ -673,18 +673,29 @@ function getInnerSchemaFromDef(def: Record<string, any>): ZodType | undefined {
     return undefined;
   }
 
-  return (def.innerType ??
-    def.schema ??
-    def.base ??
-    def.source ??
-    def.type ??
-    def.target ??
-    def.valueType ??
-    def.element ??
-    def.rest ??
-    def.catchall ??
-    def.shape ??
-    def.output) as ZodType | undefined;
+  const candidates: unknown[] = [
+    def.innerType,
+    def.schema,
+    def.base,
+    def.source,
+    def.in,
+    def.target,
+    def.valueType,
+    def.element,
+    def.rest,
+    def.catchall,
+    def.shape,
+    def.output,
+    def.type,
+  ];
+
+  for (const candidate of candidates) {
+    if (candidate && typeof candidate === 'object') {
+      return candidate as ZodType;
+    }
+  }
+
+  return undefined;
 }
 
 function getInnerSchema(schema: ZodType): ZodType | undefined {
