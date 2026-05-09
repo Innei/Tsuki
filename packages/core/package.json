@@ -1,6 +1,6 @@
 {
   "name": "@tsuki-hono/core",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Application runtime, DI container, and metadata utils for Tsuki framework",
   "repository": {
     "type": "git",
