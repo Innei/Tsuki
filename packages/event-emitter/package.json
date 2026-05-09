@@ -1,6 +1,6 @@
 {
   "name": "@tsuki-hono/event-emitter",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Redis pub/sub event system for Tsuki framework",
   "repository": {
     "type": "git",
