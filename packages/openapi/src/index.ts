@@ -125,8 +125,15 @@ const DEFAULT_SUCCESS_RESPONSE: OpenApiResponse = {
   description: 'Successful response',
 };
 
-const OPTIONAL_WRAPPER_TYPES = new Set(['ZodOptional', 'ZodDefault', 'ZodCatch']);
-const NULLABLE_WRAPPER_TYPES = new Set(['ZodNullable']);
+const OPTIONAL_WRAPPER_TYPES = new Set([
+  'ZodOptional',
+  'ZodDefault',
+  'ZodCatch',
+  'optional',
+  'default',
+  'catch',
+]);
+const NULLABLE_WRAPPER_TYPES = new Set(['ZodNullable', 'nullable']);
 const PASSTHROUGH_WRAPPER_TYPES = new Set([
   'ZodEffects',
   'ZodPipeline',
@@ -135,6 +142,8 @@ const PASSTHROUGH_WRAPPER_TYPES = new Set([
   'ZodBranded',
   'ZodBrand',
   'ZodCoerce',
+  'readonly',
+  'pipe',
 ]);
 
 interface ModuleNode {
@@ -198,9 +207,9 @@ export function createOpenApiDocument(
           continue;
         }
 
-        const parameter = buildParameter(metadata, route.path, schemas);
-        if (parameter) {
-          parameters.push(parameter);
+        const builtParameters = buildParameters(metadata, route.path, schemas);
+        if (builtParameters.length > 0) {
+          parameters.push(...builtParameters);
         }
       }
 
@@ -459,25 +468,69 @@ function convertHonoPathToOpenApi(path: string): string {
   return path.replaceAll(/:(\w+)/g, '{$1}');
 }
 
-function buildParameter(
+function buildParameters(
   metadata: RouteParamMetadataItem,
   routePath: string,
   schemas: Map<Constructor, unknown>,
-): OpenApiParameter | undefined {
+): OpenApiParameter[] {
   const location = mapParamLocation(metadata.type);
   if (!location) {
-    return undefined;
+    return [];
+  }
+
+  const expandedParameters = buildExpandedParameters(metadata, location);
+  if (expandedParameters) {
+    return expandedParameters;
   }
 
   const name = resolveParameterName(metadata, routePath);
   const schema = buildSchema(metadata.metatype, schemas);
 
-  return {
-    name,
-    in: location,
-    required: location === 'path' ? true : undefined,
-    schema,
-  };
+  return [
+    {
+      name,
+      in: location,
+      required: location === 'path' ? true : undefined,
+      schema,
+    },
+  ];
+}
+
+function buildExpandedParameters(
+  metadata: RouteParamMetadataItem,
+  location: OpenApiParameter['in'],
+): OpenApiParameter[] | undefined {
+  if (location !== 'query' || metadata.data) {
+    return undefined;
+  }
+
+  const zodSchema = getZodSchema(metadata.metatype);
+  if (!zodSchema) {
+    return undefined;
+  }
+
+  const { inner } = unwrapSchema(zodSchema);
+  if (!(inner instanceof ZodObject)) {
+    return undefined;
+  }
+
+  const def = getDefinition(inner);
+  const shapeFactory = def.shape;
+  const shape =
+    typeof inner.shape === 'function'
+      ? inner.shape()
+      : (inner.shape ??
+        (typeof shapeFactory === 'function' ? shapeFactory() : (shapeFactory ?? {})));
+
+  return Object.entries(shape as Record<string, ZodType>).map(([key, value]) => {
+    const converted = convertZodSchema(value as ZodType);
+    return {
+      name: key,
+      in: location,
+      required: converted.optional ? undefined : true,
+      schema: converted.schema,
+    };
+  });
 }
 
 function mapParamLocation(paramType: RouteParamtypes): OpenApiParameter['in'] | undefined {
@@ -620,18 +673,29 @@ function getInnerSchemaFromDef(def: Record<string, any>): ZodType | undefined {
     return undefined;
   }
 
-  return (def.innerType ??
-    def.schema ??
-    def.base ??
-    def.source ??
-    def.type ??
-    def.target ??
-    def.valueType ??
-    def.element ??
-    def.rest ??
-    def.catchall ??
-    def.shape ??
-    def.output) as ZodType | undefined;
+  const candidates: unknown[] = [
+    def.innerType,
+    def.schema,
+    def.base,
+    def.source,
+    def.in,
+    def.target,
+    def.valueType,
+    def.element,
+    def.rest,
+    def.catchall,
+    def.shape,
+    def.output,
+    def.type,
+  ];
+
+  for (const candidate of candidates) {
+    if (candidate && typeof candidate === 'object') {
+      return candidate as ZodType;
+    }
+  }
+
+  return undefined;
 }
 
 function getInnerSchema(schema: ZodType): ZodType | undefined {
@@ -739,10 +803,23 @@ function mapZodType(schema: ZodType): SchemaConversionResult {
     };
   }
 
+  const def = getDefinition(schema);
+  if (typeof def.discriminator === 'string') {
+    const unionOptions = (def.options ?? []) as ZodType[];
+    const options = unionOptions.map((option) => convertZodSchema(option as ZodType).schema);
+    return {
+      schema: {
+        oneOf: options,
+        discriminator: {
+          propertyName: def.discriminator,
+        },
+      },
+      optional: false,
+    };
+  }
+
   if (schema instanceof ZodUnion) {
-    const unionOptions = ((schema as any).options ??
-      getDefinition(schema).options ??
-      []) as ZodType[];
+    const unionOptions = (schema.options ?? def.options ?? []) as ZodType[];
     const options = unionOptions.map((option) => convertZodSchema(option as ZodType).schema);
     return {
       schema: { oneOf: options },
@@ -767,7 +844,8 @@ function mapZodType(schema: ZodType): SchemaConversionResult {
   }
 
   if (schema instanceof ZodLiteral) {
-    const { value } = getDefinition(schema);
+    const def = getDefinition(schema);
+    const value = def.value ?? (Array.isArray(def.values) ? def.values[0] : undefined);
     const type =
       typeof value === 'number' ? 'number' : typeof value === 'boolean' ? 'boolean' : 'string';
     return {
