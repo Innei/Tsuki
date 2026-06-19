@@ -1,0 +1,89 @@
+x-app-env: &app-env
+  NODE_ENV: production
+  HOSTNAME: 0.0.0.0
+  PORT: '3000'
+  DATABASE_URL: postgres://tsuki:tsuki@postgres:5432/tsuki_starter
+  REDIS_URL: redis://redis:6379
+
+services:
+  app:
+    image: tsuki-starter:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: tsuki-starter
+    environment:
+      <<: *app-env
+      AUTO_MIGRATE: 'false'
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+    ports:
+      - '3000:3000'
+    restart: unless-stopped
+    networks: [tsuki]
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'node -e "fetch(`http://127.0.0.1:3000/internal/openapi.json`).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"',
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  migrate:
+    image: tsuki-starter:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: tsuki-starter-migrate
+    command: ['node', 'migrate.mjs']
+    environment: *app-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: 'no'
+    networks: [tsuki]
+
+  postgres:
+    image: postgres:17-alpine
+    container_name: tsuki-postgres
+    environment:
+      POSTGRES_USER: tsuki
+      POSTGRES_PASSWORD: tsuki
+      POSTGRES_DB: tsuki_starter
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U tsuki -d tsuki_starter']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks: [tsuki]
+
+  redis:
+    image: redis:7-alpine
+    container_name: tsuki-redis
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks: [tsuki]
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  tsuki:
+    driver: bridge

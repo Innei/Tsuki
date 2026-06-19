@@ -29,6 +29,7 @@ NestJS remains the reference for many of these patterns; Tsuki adapts them for H
 | [`@tsuki-hono/core`](./packages/core)                   | Application runtime, DI container utils, route registration            |
 | [`@tsuki-hono/event-emitter`](./packages/event-emitter) | Redis pub/sub event system with `@OnEvent` / `@EmitEvent`              |
 | [`@tsuki-hono/openapi`](./packages/openapi)             | OpenAPI 3.1 document generation from decorator metadata                |
+| [`create-tsuki-app`](./packages/create-tsuki-app)       | Scaffolder CLI for new Tsuki apps                                      |
 
 ## Built with Tsuki
 
@@ -38,19 +39,30 @@ Projects that ship on this stack:
 
 ## Quick Start
 
+### Scaffold a new project
+
 ```bash
-# Clone the repository
+pnpm create tsuki-app my-app
+cd my-app
+pnpm install
+docker compose up -d # postgres + redis
+cp .env.example .env
+pnpm db:generate && pnpm db:migrate
+pnpm dev
+```
+
+This bootstraps the [`examples/starter`](./examples/starter) template — a production-shaped Hono app with all four `@tsuki-hono/*` packages wired together: postgres + drizzle, ioredis, decorator-based modules, OpenAPI docs at `/internal/docs`, typed `AppException` error envelope, and a release-phase Dockerfile that migrates with a `pg_advisory_lock`.
+
+### Work on the monorepo
+
+```bash
 git clone https://github.com/innei/tsuki.git
 cd tsuki
-
-# Install dependencies
 pnpm install
-
-# Run tests
 pnpm test
 ```
 
-## Usage
+## Minimal usage
 
 ```ts
 import 'reflect-metadata';
@@ -77,7 +89,7 @@ async function bootstrap() {
 bootstrap();
 ```
 
-See individual package READMEs for detailed documentation.
+See individual package READMEs for detailed documentation, and [`examples/starter`](./examples/starter) for a fuller production-shaped reference (DB, Redis, events, OpenAPI, error envelope, Docker).
 
 ## AI assistants and agents
 

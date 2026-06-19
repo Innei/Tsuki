@@ -1,0 +1,6 @@
+{
+  "exec": "vite-node src/index.ts",
+  "ext": "ts,json",
+  "ignore": ["dist", "node_modules"],
+  "watch": ["src", ".env"]
+}

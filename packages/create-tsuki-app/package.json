@@ -1,0 +1,33 @@
+{
+  "name": "create-tsuki-app",
+  "version": "0.0.0",
+  "description": "Scaffold a new Tsuki application from the official starter template",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/innei/tsuki",
+    "directory": "packages/create-tsuki-app"
+  },
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "create-tsuki-app": "./dist/index.mjs"
+  },
+  "files": [
+    "dist",
+    "template"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "prepublishOnly": "pnpm sync-template && pnpm build",
+    "sync-template": "node scripts/sync-template.mjs"
+  },
+  "dependencies": {
+    "picocolors": "1.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.3"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

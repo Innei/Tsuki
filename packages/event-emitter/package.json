@@ -32,11 +32,11 @@
     "tsyringe": "4.10.0"
   },
   "devDependencies": {
-    "@types/node": "^25.5.2",
-    "hono": "4.12.12",
-    "ioredis": "5.10.1",
+    "@types/node": "^25.9.3",
+    "hono": "4.12.26",
+    "ioredis": "5.11.1",
     "unplugin-swc": "1.5.9",
-    "vitest": "4.1.3"
+    "vitest": "4.1.9"
   },
   "peerDependencies": {
     "ioredis": ">=5.8.0"

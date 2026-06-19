@@ -1,0 +1,43 @@
+{
+  "name": "@tsuki-hono/starter",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Reference starter for building applications with Tsuki",
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio",
+    "dev": "nodemon",
+    "start": "node dist/main.mjs",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13.7",
+    "@tsuki-hono/common": "workspace:*",
+    "@tsuki-hono/core": "workspace:*",
+    "@tsuki-hono/event-emitter": "workspace:*",
+    "@tsuki-hono/openapi": "workspace:*",
+    "drizzle-orm": "^0.45.2",
+    "hono": "4.12.26",
+    "ioredis": "5.11.1",
+    "pg": "^8.21.0",
+    "picocolors": "1.1.1",
+    "reflect-metadata": "0.2.2",
+    "tsyringe": "4.10.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.3",
+    "@types/pg": "8.20.0",
+    "drizzle-kit": "^0.31.5",
+    "nodemon": "3.1.14",
+    "unplugin-swc": "1.5.9",
+    "vite": "^6.0.0",
+    "vite-node": "^6.0.0",
+    "vite-tsconfig-paths": "^6.1.1",
+    "vitest": "4.1.9"
+  }
+}
