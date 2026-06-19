@@ -14,7 +14,7 @@ function locateTemplate(): string {
     path.resolve(__dirname, '..', '..', '..', 'examples', 'starter'),
   ];
   for (const candidate of candidates) {
-    if (existsSync(resolve(candidate, 'package.json'))) {
+    if (existsSync(path.resolve(candidate, 'package.json'))) {
       return candidate;
     }
   }

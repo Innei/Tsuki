@@ -154,9 +154,6 @@ importers:
       '@tsuki-hono/common':
         specifier: workspace:*
         version: link:../common
-      hono:
-        specifier: 4.12.26
-        version: 4.12.26
       picocolors:
         specifier: 1.1.1
         version: 1.1.1
@@ -170,6 +167,9 @@ importers:
       '@types/node':
         specifier: ^25.9.3
         version: 25.9.3
+      hono:
+        specifier: 4.12.26
+        version: 4.12.26
       unplugin-swc:
         specifier: 1.5.9
         version: 1.5.9(@swc/core@1.15.24)(rollup@4.62.0)
