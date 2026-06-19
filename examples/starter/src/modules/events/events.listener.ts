@@ -3,7 +3,7 @@ import { OnEvent } from '@tsuki-hono/event-emitter';
 import { injectable } from 'tsyringe';
 
 import type { Post } from '../../database/schema';
-import type { RedisProvider } from '../../redis/redis.provider';
+import { RedisProvider } from '../../redis/redis.provider';
 
 const logger = createLogger('Events');
 

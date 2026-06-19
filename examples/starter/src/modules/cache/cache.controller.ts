@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 import { createAppException } from '../../common/errors/app-error.factory';
 import { AppErrorCode } from '../../common/errors/app-error-code';
-import type { RedisProvider } from '../../redis/redis.provider';
+import { RedisProvider } from '../../redis/redis.provider';
 
 const setBodySchema = z.object({
   value: z.string().max(10_000),

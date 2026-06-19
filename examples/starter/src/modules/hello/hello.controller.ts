@@ -1,6 +1,6 @@
 import { ApiDoc, ApiTags, Body, Controller, Get, Post, Query } from '@tsuki-hono/common';
 
-import type { GreetBodyDto, HelloQueryDto } from './hello.dto';
+import { GreetBodyDto, HelloQueryDto } from './hello.dto';
 
 @Controller('hello')
 @ApiTags('hello')

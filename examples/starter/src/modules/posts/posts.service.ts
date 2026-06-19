@@ -2,7 +2,7 @@ import { EmitEvent } from '@tsuki-hono/event-emitter';
 import { desc, eq } from 'drizzle-orm';
 import { injectable } from 'tsyringe';
 
-import type { DatabaseProvider } from '../../database/database.provider';
+import { DatabaseProvider } from '../../database/database.provider';
 import { type NewPost, type Post, posts } from '../../database/schema';
 
 @injectable()

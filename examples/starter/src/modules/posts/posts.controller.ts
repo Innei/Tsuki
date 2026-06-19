@@ -4,8 +4,8 @@ import { z } from 'zod';
 import { createAppException } from '../../common/errors/app-error.factory';
 import { AppErrorCode } from '../../common/errors/app-error-code';
 import { withMeta } from '../../common/response/envelope.types';
-import type { CreatePostDto } from './posts.dto';
-import type { PostsService } from './posts.service';
+import { CreatePostDto } from './posts.dto';
+import { PostsService } from './posts.service';
 
 const idParamSchema = z.coerce.number().int().positive();
 

@@ -1,8 +1,8 @@
 import { ApiDoc, ApiTags, Controller, Post } from '@tsuki-hono/common';
 import { injectable } from 'tsyringe';
 
-import type { RedisProvider } from '../../redis/redis.provider';
-import type { EventsService } from './events.service';
+import { RedisProvider } from '../../redis/redis.provider';
+import { EventsService } from './events.service';
 
 @Controller('events')
 @ApiTags('events')
