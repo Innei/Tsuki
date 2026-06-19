@@ -14,7 +14,20 @@ nodeBuiltins.push(...nodeBuiltins.map((m) => `node:${m}`));
 const external = ['ioredis', 'pg', 'pg-native'];
 
 export default defineConfig({
-  plugins: [tsconfigPaths(), swc.vite()],
+  plugins: [
+    tsconfigPaths(),
+    swc.vite({
+      jsc: {
+        target: 'esnext',
+        parser: { syntax: 'typescript', decorators: true },
+        transform: {
+          legacyDecorator: true,
+          decoratorMetadata: true,
+        },
+        keepClassNames: true,
+      },
+    }),
+  ],
   esbuild: false,
   ssr: {
     noExternal: true,
