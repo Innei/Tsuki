@@ -365,16 +365,6 @@ export class HonoHttpApplication {
     }
 
     if ('useExisting' in config && config.useExisting) {
-      this.enqueueLifecycleResolver(
-        () => {
-          const value = this.container.resolve(config.useExisting as any);
-          return enhancerType === 'middleware'
-            ? (this.extractMiddlewareLifecycleTarget(value) ?? value)
-            : value;
-        },
-        undefined,
-        true,
-      );
       const resolver = () => {
         const existing = this.container.resolve(config.useExisting as any);
         if (enhancerType === 'middleware') {
@@ -612,11 +602,6 @@ export class HonoHttpApplication {
 
     if ('useExisting' in config && config.useExisting) {
       this.registerExistingProvider(provideToken, config.useExisting);
-      this.enqueueLifecycleResolver(
-        () => this.container.resolve(provideToken as any),
-        undefined,
-        true,
-      );
       return;
     }
 

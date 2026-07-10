@@ -1582,6 +1582,101 @@ describe('Lifecycle hooks integration', () => {
     await app.close('provider-lifecycle');
     expect(calls).toEqual(['factory:destroy', 'value:destroy', 'class:destroy']);
   });
+
+  it('does not run lifecycle hooks for regular useExisting aliases to transient providers', async () => {
+    const TRANSIENT_TOKEN = Symbol('TRANSIENT_TOKEN');
+    const ALIAS_TOKEN = Symbol('ALIAS_TOKEN');
+    const calls: string[] = [];
+
+    @injectable()
+    class TransientLifecycle implements OnModuleInit, OnModuleDestroy {
+      onModuleInit() {
+        calls.push('init');
+      }
+      onModuleDestroy() {
+        calls.push('destroy');
+      }
+      ping() {
+        return 'pong';
+      }
+    }
+
+    @Module({
+      providers: [
+        { provide: TRANSIENT_TOKEN, useClass: TransientLifecycle, singleton: false },
+        { provide: ALIAS_TOKEN, useExisting: TRANSIENT_TOKEN },
+      ],
+    })
+    class TransientAliasModule {}
+
+    const app = await createApplication(TransientAliasModule);
+    expect(calls).toEqual([]);
+
+    const aliasA = app.getContainer().resolve<TransientLifecycle>(ALIAS_TOKEN);
+    const aliasB = app.getContainer().resolve<TransientLifecycle>(ALIAS_TOKEN);
+    expect(aliasA.ping()).toBe('pong');
+    expect(aliasA).not.toBe(aliasB);
+    expect(calls).toEqual([]);
+
+    await app.close('transient-alias');
+    expect(calls).toEqual([]);
+  });
+
+  it('does not run lifecycle hooks for APP useExisting aliases to transient enhancers', async () => {
+    const TRANSIENT_GUARD_TOKEN = Symbol('TRANSIENT_GUARD_TOKEN');
+    const calls: string[] = [];
+
+    @injectable()
+    class TransientGuard implements CanActivate, OnModuleInit, OnModuleDestroy {
+      canActivate() {
+        calls.push('activate');
+        return true;
+      }
+      onModuleInit() {
+        calls.push('init');
+      }
+      onModuleDestroy() {
+        calls.push('destroy');
+      }
+    }
+
+    @Controller('transient-enhancer')
+    class TransientEnhancerController {
+      @Get('/')
+      ping() {
+        return 'pong';
+      }
+    }
+
+    @Module({
+      controllers: [TransientEnhancerController],
+      providers: [
+        {
+          provide: TRANSIENT_GUARD_TOKEN,
+          useClass: TransientGuard,
+          singleton: false,
+        },
+        {
+          provide: APP_GUARD as unknown as Constructor,
+          useExisting: TRANSIENT_GUARD_TOKEN,
+        },
+      ],
+    })
+    class TransientEnhancerAliasModule {}
+
+    const app = await createApplication(TransientEnhancerAliasModule);
+    expect(calls).toEqual([]);
+
+    const response = await app
+      .getInstance()
+      .fetch(new Request('http://localhost/transient-enhancer'));
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe('pong');
+    expect(calls).toEqual(['activate']);
+
+    await app.close('transient-enhancer-alias');
+    expect(calls).toEqual(['activate']);
+  });
 });
 
 describe('Container resolution policy', () => {
