@@ -217,4 +217,41 @@ describe('createOpenApiDocument · Zod 4 schema lowering', () => {
       expect(schema.properties.booleanLit).toEqual({ type: 'boolean', enum: [true] });
     });
   });
+
+  it('preserves string and number constraints', () => {
+    class ConstraintDto extends createZodSchemaDto(
+      z.object({
+        email: z.string().min(3).max(64).email(),
+        code: z.string().length(8),
+        count: z.number().min(1).max(10).int(),
+        ratio: z.number().gt(0).lt(1),
+      }),
+      { name: 'ConstraintDto' },
+    ) {}
+
+    @Controller('constraints')
+    class ConstraintController {
+      @Post('/')
+      create(@Body() _body: ConstraintDto) {
+        void _body;
+      }
+    }
+
+    const doc = buildDocFromController(ConstraintController);
+    const properties = (doc.components?.schemas?.ConstraintDto as any).properties;
+
+    expect(properties.email).toEqual({
+      type: 'string',
+      minLength: 3,
+      maxLength: 64,
+      format: 'email',
+    });
+    expect(properties.code).toEqual({ type: 'string', minLength: 8, maxLength: 8 });
+    expect(properties.count).toMatchObject({ type: 'integer', minimum: 1, maximum: 10 });
+    expect(properties.ratio).toMatchObject({
+      type: 'number',
+      exclusiveMinimum: 0,
+      exclusiveMaximum: 1,
+    });
+  });
 });
