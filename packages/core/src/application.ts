@@ -316,7 +316,7 @@ export class HonoHttpApplication {
     if (this.isConstructorToken(provider)) {
       const token = provider as Constructor;
       const generation = this.trackProviderLifetime(token, true);
-      this.registerSingleton(token);
+      this.registerModuleOwnedSingleton(token);
       this.enqueueModuleProviderLifecycleResolver(
         token,
         generation,
@@ -370,7 +370,7 @@ export class HonoHttpApplication {
 
     if ('useClass' in config && config.useClass) {
       const useClass = config.useClass as Constructor;
-      this.registerSingleton(useClass);
+      this.registerModuleOwnedSingleton(useClass);
       this.enqueueLifecycleResolver(() => this.getProviderInstance(useClass), useClass);
       const resolver = () => {
         const instance = this.getProviderInstance(useClass);
@@ -976,16 +976,21 @@ export class HonoHttpApplication {
       .join('\n');
   }
 
+  private registerModuleOwnedSingleton<T>(token: Constructor<T>): void {
+    const injectionToken = token as unknown as InjectionToken<T>;
+    this.container.registerSingleton(injectionToken, token);
+    const providerName = token.name && token.name.length > 0 ? token.name : token.toString();
+    this.diLogger.debug(
+      'Registered singleton provider',
+      colors.yellow(providerName),
+      colors.green(`+${performance.now().toFixed(2)}ms`),
+    );
+  }
+
   private registerSingleton<T>(token: Constructor<T>): void {
     const injectionToken = token as unknown as InjectionToken<T>;
     if (!this.container.isRegistered(injectionToken, true)) {
-      this.container.registerSingleton(injectionToken, token);
-      const providerName = token.name && token.name.length > 0 ? token.name : token.toString();
-      this.diLogger.debug(
-        'Registered singleton provider',
-        colors.yellow(providerName),
-        colors.green(`+${performance.now().toFixed(2)}ms`),
-      );
+      this.registerModuleOwnedSingleton(token);
     }
   }
 
@@ -1024,7 +1029,7 @@ export class HonoHttpApplication {
     }
 
     for (const controller of metadata.controllers ?? []) {
-      this.registerSingleton(controller as Constructor);
+      this.registerModuleOwnedSingleton(controller as Constructor);
       this.enqueueLifecycleResolver(
         () => this.getProviderInstance(controller as Constructor),
         controller as Constructor,

@@ -1686,6 +1686,74 @@ describe('Lifecycle hooks integration', () => {
     ]);
   });
 
+  it('uses an explicit APP useClass declaration over an earlier class-token registration', async () => {
+    const calls: string[] = [];
+
+    @injectable()
+    class DeclaredGuard implements CanActivate, OnModuleInit, OnModuleDestroy {
+      canActivate() {
+        calls.push('declared:activate');
+        return true;
+      }
+      onModuleInit() {
+        calls.push('declared:init');
+      }
+      onModuleDestroy() {
+        calls.push('declared:destroy');
+      }
+    }
+
+    @injectable()
+    class EarlierGuard implements CanActivate, OnModuleInit, OnModuleDestroy {
+      canActivate() {
+        calls.push('earlier:activate');
+        return true;
+      }
+      onModuleInit() {
+        calls.push('earlier:init');
+      }
+      onModuleDestroy() {
+        calls.push('earlier:destroy');
+      }
+    }
+
+    @Controller('owned-app-guard')
+    class OwnedAppGuardController {
+      @Get('/')
+      ping() {
+        return 'pong';
+      }
+    }
+
+    @Module({
+      providers: [{ provide: DeclaredGuard, useClass: EarlierGuard }],
+    })
+    class EarlierGuardModule {}
+
+    @Module({
+      imports: [EarlierGuardModule],
+      controllers: [OwnedAppGuardController],
+      providers: [
+        {
+          provide: APP_GUARD as unknown as Constructor,
+          useClass: DeclaredGuard,
+        },
+      ],
+    })
+    class OwnedAppGuardModule {}
+
+    const app = await createApplication(OwnedAppGuardModule);
+    expect(calls).toEqual(['declared:init']);
+
+    const response = await app.getInstance().fetch(new Request('http://localhost/owned-app-guard'));
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe('pong');
+    expect(calls).toEqual(['declared:init', 'declared:activate']);
+
+    await app.close('owned-app-guard');
+    expect(calls).toEqual(['declared:init', 'declared:activate', 'declared:destroy']);
+  });
+
   it('does not adopt lifecycle ownership through APP aliases to custom-container providers', async () => {
     const EXTERNAL_GUARD_TOKEN = Symbol('EXTERNAL_GUARD_TOKEN');
     const calls: string[] = [];
@@ -1946,6 +2014,150 @@ describe('Lifecycle hooks integration', () => {
 
     await app.close('final-singleton');
     expect(calls).toEqual(['final:init', 'final:destroy']);
+  });
+
+  it('lets a root constructor provider replace an imported class registration', async () => {
+    const calls: string[] = [];
+
+    @injectable()
+    class Service implements OnModuleInit, OnModuleDestroy {
+      identify() {
+        return 'service';
+      }
+      onModuleInit() {
+        calls.push('service:init');
+      }
+      onModuleDestroy() {
+        calls.push('service:destroy');
+      }
+    }
+
+    @injectable()
+    class MockService implements OnModuleInit, OnModuleDestroy {
+      identify() {
+        return 'mock';
+      }
+      onModuleInit() {
+        calls.push('mock:init');
+      }
+      onModuleDestroy() {
+        calls.push('mock:destroy');
+      }
+    }
+
+    @Module({
+      providers: [{ provide: Service, useClass: MockService }],
+    })
+    class ImportedMockModule {}
+
+    @Module({
+      imports: [ImportedMockModule],
+      providers: [Service],
+    })
+    class RootServiceModule {}
+
+    const app = await createApplication(RootServiceModule);
+    const resolved = app.getContainer().resolve(Service);
+
+    expect(resolved).toBeInstanceOf(Service);
+    expect(resolved.identify()).toBe('service');
+    expect(calls).toEqual(['service:init']);
+
+    await app.close('constructor-override');
+    expect(calls).toEqual(['service:init', 'service:destroy']);
+  });
+
+  it('lets a root constructor provider replace an imported transient with one singleton', async () => {
+    const initIds: number[] = [];
+    const destroyIds: number[] = [];
+    let instanceCount = 0;
+
+    @injectable()
+    class Service implements OnModuleInit, OnModuleDestroy {
+      readonly id = ++instanceCount;
+      onModuleInit() {
+        initIds.push(this.id);
+      }
+      onModuleDestroy() {
+        destroyIds.push(this.id);
+      }
+    }
+
+    @Module({
+      providers: [{ provide: Service, useClass: Service, singleton: false }],
+    })
+    class ImportedTransientModule {}
+
+    @Module({
+      imports: [ImportedTransientModule],
+      providers: [Service],
+    })
+    class RootSingletonModule {}
+
+    const app = await createApplication(RootSingletonModule);
+    const first = app.getContainer().resolve(Service);
+    const second = app.getContainer().resolve(Service);
+
+    expect(first).toBe(second);
+    expect(instanceCount).toBe(1);
+    expect(initIds).toEqual([first.id]);
+
+    await app.close('constructor-singleton');
+    expect(destroyIds).toEqual([first.id]);
+  });
+
+  it('lets a root controller declaration replace an imported class registration', async () => {
+    const calls: string[] = [];
+
+    @Controller('owned-controller')
+    class DeclaredController implements OnModuleInit, OnModuleDestroy {
+      @Get('/')
+      handle() {
+        return 'declared';
+      }
+      onModuleInit() {
+        calls.push('declared:init');
+      }
+      onModuleDestroy() {
+        calls.push('declared:destroy');
+      }
+    }
+
+    class EarlierController {
+      handle() {
+        return 'earlier';
+      }
+      onModuleInit() {
+        calls.push('earlier:init');
+      }
+      onModuleDestroy() {
+        calls.push('earlier:destroy');
+      }
+    }
+
+    @Module({
+      providers: [{ provide: DeclaredController, useClass: EarlierController }],
+    })
+    class EarlierControllerModule {}
+
+    @Module({
+      imports: [EarlierControllerModule],
+      controllers: [DeclaredController],
+    })
+    class RootControllerModule {}
+
+    const app = await createApplication(RootControllerModule);
+    expect(app.getContainer().resolve(DeclaredController)).toBeInstanceOf(DeclaredController);
+    expect(calls).toEqual(['declared:init']);
+
+    const response = await app
+      .getInstance()
+      .fetch(new Request('http://localhost/owned-controller'));
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe('declared');
+
+    await app.close('owned-controller');
+    expect(calls).toEqual(['declared:init', 'declared:destroy']);
   });
 
   it('does not run lifecycle hooks for APP useExisting aliases to transient enhancers', async () => {
