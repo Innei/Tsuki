@@ -1583,6 +1583,64 @@ describe('Lifecycle hooks integration', () => {
     expect(calls).toEqual(['factory:destroy', 'value:destroy', 'class:destroy']);
   });
 
+  it('runs lifecycle hooks for APP useExisting aliases to singleton middleware definitions', async () => {
+    const MIDDLEWARE_TOKEN = Symbol('MIDDLEWARE_TOKEN');
+    const calls: string[] = [];
+
+    const lifecycleMiddleware: HttpMiddleware & OnModuleInit & OnModuleDestroy = {
+      async use(_context, next) {
+        calls.push('middleware:before');
+        await next();
+        calls.push('middleware:after');
+      },
+      onModuleInit() {
+        calls.push('init');
+      },
+      onModuleDestroy() {
+        calls.push('destroy');
+      },
+    };
+
+    @Controller('singleton-middleware')
+    class SingletonMiddlewareController {
+      @Get('/')
+      ping() {
+        return 'pong';
+      }
+    }
+
+    @Module({
+      controllers: [SingletonMiddlewareController],
+      providers: [
+        {
+          provide: MIDDLEWARE_TOKEN,
+          useValue: {
+            handler: lifecycleMiddleware,
+            path: '/singleton-middleware',
+          },
+        },
+        {
+          provide: APP_MIDDLEWARE as unknown as Constructor,
+          useExisting: MIDDLEWARE_TOKEN,
+        },
+      ],
+    })
+    class SingletonMiddlewareAliasModule {}
+
+    const app = await createApplication(SingletonMiddlewareAliasModule);
+    expect(calls).toEqual(['init']);
+
+    const response = await app
+      .getInstance()
+      .fetch(new Request('http://localhost/singleton-middleware'));
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe('pong');
+    expect(calls).toEqual(['init', 'middleware:before', 'middleware:after']);
+
+    await app.close('singleton-middleware-alias');
+    expect(calls).toEqual(['init', 'middleware:before', 'middleware:after', 'destroy']);
+  });
+
   it('does not run lifecycle hooks for regular useExisting aliases to transient providers', async () => {
     const TRANSIENT_TOKEN = Symbol('TRANSIENT_TOKEN');
     const ALIAS_TOKEN = Symbol('ALIAS_TOKEN');
@@ -1624,6 +1682,7 @@ describe('Lifecycle hooks integration', () => {
 
   it('does not run lifecycle hooks for APP useExisting aliases to transient enhancers', async () => {
     const TRANSIENT_GUARD_TOKEN = Symbol('TRANSIENT_GUARD_TOKEN');
+    const TRANSIENT_GUARD_ALIAS = Symbol('TRANSIENT_GUARD_ALIAS');
     const calls: string[] = [];
 
     @injectable()
@@ -1657,8 +1716,12 @@ describe('Lifecycle hooks integration', () => {
           singleton: false,
         },
         {
-          provide: APP_GUARD as unknown as Constructor,
+          provide: TRANSIENT_GUARD_ALIAS,
           useExisting: TRANSIENT_GUARD_TOKEN,
+        },
+        {
+          provide: APP_GUARD as unknown as Constructor,
+          useExisting: TRANSIENT_GUARD_ALIAS,
         },
       ],
     })
