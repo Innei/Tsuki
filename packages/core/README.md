@@ -102,6 +102,11 @@ Providers implementing these interfaces have their hooks called automatically:
 4. `onModuleDestroy()` — teardown
 5. `onApplicationShutdown(signal?)` — final step
 
+Lifecycle hooks apply to constructor providers, values, aliases, and singleton
+`useClass`/`useFactory` providers. Singleton factories are materialized during
+application initialization so their hooks can be discovered. Transient providers
+do not have an application lifecycle because they do not have one canonical instance.
+
 ## License
 
 MIT

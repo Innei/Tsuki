@@ -1472,11 +1472,11 @@ describe('HonoHttpApplication internals', () => {
   it('throws descriptive error for invalid provider configuration objects', async () => {
     const app = await createApplication(FactoryModule);
     const internals = app as unknown as {
-      registerRegularProvider: (config: any, scoped: Constructor[]) => void;
+      registerRegularProvider: (config: any) => void;
     };
 
     expect(() =>
-      internals.registerRegularProvider({ provide: Symbol('no-resolver') } as any, []),
+      internals.registerRegularProvider({ provide: Symbol('no-resolver') } as any),
     ).toThrowError(/Invalid provider configuration/);
 
     await app.close('invalid-provider-config');
@@ -1534,6 +1534,53 @@ describe('Lifecycle hooks integration', () => {
     await app.close('SIGTERM');
 
     expect(lifecycleEvents).toEqual(['before:SIGTERM', 'module:destroy', 'app:shutdown:SIGTERM']);
+  });
+
+  it('runs lifecycle hooks once for custom-token singleton providers', async () => {
+    const CLASS_TOKEN = Symbol('CLASS_TOKEN');
+    const VALUE_TOKEN = Symbol('VALUE_TOKEN');
+    const FACTORY_TOKEN = Symbol('FACTORY_TOKEN');
+    const ALIAS_TOKEN = Symbol('ALIAS_TOKEN');
+    const calls: string[] = [];
+
+    @injectable()
+    class ClassLifecycle implements OnModuleInit, OnModuleDestroy {
+      onModuleInit() {
+        calls.push('class:init');
+      }
+      onModuleDestroy() {
+        calls.push('class:destroy');
+      }
+    }
+
+    const valueLifecycle = {
+      onModuleInit: () => calls.push('value:init'),
+      onModuleDestroy: () => calls.push('value:destroy'),
+    };
+
+    @Module({
+      providers: [
+        { provide: CLASS_TOKEN, useClass: ClassLifecycle },
+        { provide: ALIAS_TOKEN, useExisting: CLASS_TOKEN },
+        { provide: VALUE_TOKEN, useValue: valueLifecycle },
+        {
+          provide: FACTORY_TOKEN,
+          useFactory: () => ({
+            onModuleInit: () => calls.push('factory:init'),
+            onModuleDestroy: () => calls.push('factory:destroy'),
+          }),
+        },
+      ],
+    })
+    class ProviderLifecycleModule {}
+
+    const app = await createApplication(ProviderLifecycleModule);
+    expect(calls).toEqual(['class:init', 'value:init', 'factory:init']);
+    expect(app.getContainer().resolve(ALIAS_TOKEN)).toBe(app.getContainer().resolve(CLASS_TOKEN));
+
+    calls.length = 0;
+    await app.close('provider-lifecycle');
+    expect(calls).toEqual(['factory:destroy', 'value:destroy', 'class:destroy']);
   });
 });
 
