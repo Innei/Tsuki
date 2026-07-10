@@ -287,7 +287,6 @@ export class HonoHttpApplication {
         throw error;
       }
       this.instances.set(token, instance);
-      this.registerLifecycleHandlers(instance);
     }
 
     return this.instances.get(token) as T;

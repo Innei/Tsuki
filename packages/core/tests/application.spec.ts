@@ -1754,6 +1754,198 @@ describe('Lifecycle hooks integration', () => {
     expect(calls).toEqual(['declared:init', 'declared:activate', 'declared:destroy']);
   });
 
+  it('runs complete lifecycle once for a decorator-discovered module singleton guard', async () => {
+    const calls: string[] = [];
+
+    @injectable()
+    class SingletonGuard
+      implements
+        CanActivate,
+        OnModuleInit,
+        OnApplicationBootstrap,
+        OnModuleDestroy,
+        OnApplicationShutdown
+    {
+      canActivate() {
+        calls.push('activate');
+        return true;
+      }
+      onModuleInit() {
+        calls.push('init');
+      }
+      onApplicationBootstrap() {
+        calls.push('bootstrap');
+      }
+      onModuleDestroy() {
+        calls.push('destroy');
+      }
+      onApplicationShutdown(signal?: string) {
+        calls.push(`shutdown:${signal ?? 'none'}`);
+      }
+    }
+
+    @Controller('singleton-decorator-guard')
+    class SingletonGuardController {
+      @Get('/')
+      @UseGuards(SingletonGuard)
+      ping() {
+        return 'pong';
+      }
+    }
+
+    @Module({
+      controllers: [SingletonGuardController],
+      providers: [SingletonGuard],
+    })
+    class SingletonGuardModule {}
+
+    const app = await createApplication(SingletonGuardModule);
+    expect(calls).toEqual(['init', 'bootstrap']);
+
+    const response = await app
+      .getInstance()
+      .fetch(new Request('http://localhost/singleton-decorator-guard'));
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe('pong');
+    expect(calls).toEqual(['init', 'bootstrap', 'activate']);
+
+    await app.close('singleton-decorator-guard');
+    expect(calls).toEqual([
+      'init',
+      'bootstrap',
+      'activate',
+      'destroy',
+      'shutdown:singleton-decorator-guard',
+    ]);
+  });
+
+  it('does not enroll a decorator-discovered module transient guard in lifecycle', async () => {
+    const calls: string[] = [];
+
+    @injectable()
+    class TransientDecoratorGuard
+      implements
+        CanActivate,
+        OnModuleInit,
+        OnApplicationBootstrap,
+        OnModuleDestroy,
+        OnApplicationShutdown
+    {
+      canActivate() {
+        calls.push('activate');
+        return true;
+      }
+      onModuleInit() {
+        calls.push('init');
+      }
+      onApplicationBootstrap() {
+        calls.push('bootstrap');
+      }
+      onModuleDestroy() {
+        calls.push('destroy');
+      }
+      onApplicationShutdown() {
+        calls.push('shutdown');
+      }
+    }
+
+    @Controller('transient-decorator-guard')
+    class TransientGuardController {
+      @Get('/')
+      @UseGuards(TransientDecoratorGuard)
+      ping() {
+        return 'pong';
+      }
+    }
+
+    @Module({
+      controllers: [TransientGuardController],
+      providers: [
+        {
+          provide: TransientDecoratorGuard,
+          useClass: TransientDecoratorGuard,
+          singleton: false,
+        },
+      ],
+    })
+    class TransientDecoratorGuardModule {}
+
+    const app = await createApplication(TransientDecoratorGuardModule);
+    expect(calls).toEqual([]);
+
+    const response = await app
+      .getInstance()
+      .fetch(new Request('http://localhost/transient-decorator-guard'));
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe('pong');
+    expect(calls).toEqual(['activate']);
+
+    await app.close('transient-decorator-guard');
+    expect(calls).toEqual(['activate']);
+  });
+
+  it('does not enroll a decorator-discovered external guard in lifecycle', async () => {
+    const calls: string[] = [];
+
+    @injectable()
+    class ExternalDecoratorGuard
+      implements
+        CanActivate,
+        OnModuleInit,
+        OnApplicationBootstrap,
+        OnModuleDestroy,
+        OnApplicationShutdown
+    {
+      canActivate() {
+        calls.push('activate');
+        return true;
+      }
+      onModuleInit() {
+        calls.push('init');
+      }
+      onApplicationBootstrap() {
+        calls.push('bootstrap');
+      }
+      onModuleDestroy() {
+        calls.push('destroy');
+      }
+      onApplicationShutdown() {
+        calls.push('shutdown');
+      }
+    }
+
+    const externalGuard = new ExternalDecoratorGuard();
+    const applicationContainer = container.createChildContainer();
+    applicationContainer.register(ExternalDecoratorGuard, { useValue: externalGuard });
+
+    @Controller('external-decorator-guard')
+    class ExternalDecoratorGuardController {
+      @Get('/')
+      @UseGuards(ExternalDecoratorGuard)
+      ping() {
+        return 'pong';
+      }
+    }
+
+    @Module({ controllers: [ExternalDecoratorGuardController] })
+    class ExternalDecoratorGuardModule {}
+
+    const app = await createApplication(ExternalDecoratorGuardModule, {
+      container: applicationContainer,
+    });
+    expect(calls).toEqual([]);
+
+    const response = await app
+      .getInstance()
+      .fetch(new Request('http://localhost/external-decorator-guard'));
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe('pong');
+    expect(calls).toEqual(['activate']);
+
+    await app.close('external-decorator-guard');
+    expect(calls).toEqual(['activate']);
+  });
+
   it('does not adopt lifecycle ownership through APP aliases to custom-container providers', async () => {
     const EXTERNAL_GUARD_TOKEN = Symbol('EXTERNAL_GUARD_TOKEN');
     const calls: string[] = [];
