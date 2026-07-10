@@ -253,7 +253,9 @@ describe('Redis Event System', () => {
     redis.echoPublishedMessages = true;
 
     const deliveries: unknown[] = [];
-    emitter.on('local.once', (payload) => deliveries.push(payload));
+    emitter.on('local.once', (payload) => {
+      deliveries.push(payload);
+    });
 
     await emitter.emit('local.once', { id: 'one' });
 
@@ -267,7 +269,9 @@ describe('Redis Event System', () => {
     const emitter = container.resolve(EventEmitterService);
     const redis = container.resolve(RedisAccessor).get();
     const deliveries: unknown[] = [];
-    emitter.on('remote.compatible', (payload) => deliveries.push(payload));
+    emitter.on('remote.compatible', (payload) => {
+      deliveries.push(payload);
+    });
 
     redis.emit(
       'test:events',
