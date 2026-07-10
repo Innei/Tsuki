@@ -12,6 +12,7 @@ import { EmitEvent, EventEmitterService, EventModule, OnEvent } from '../src';
  * A simple in-memory Redis mock compatible with the minimal interface used by the event system.
  */
 class FakeRedis {
+  public echoPublishedMessages = false;
   public published: Array<{ channel: string; message: string }> = [];
   public subscribed: Set<string> = new Set<string>();
   public unsubscribed: Set<string> = new Set<string>();
@@ -21,6 +22,9 @@ class FakeRedis {
 
   publish(channel: string, message: string): Promise<number> {
     this.published.push({ channel, message });
+    if (this.echoPublishedMessages) {
+      this.messageHandler?.(channel, message);
+    }
     return Promise.resolve(1);
   }
 
@@ -238,6 +242,52 @@ describe('Redis Event System', () => {
     await emitter.emit('custom.event', { n: 2 });
     expect(calls).toEqual([{ n: 1 }]); // unchanged
 
+    await app.close();
+  });
+
+  it('dispatches a locally emitted event once when Redis echoes it', async () => {
+    const app = await createApplication(EventTestModule);
+    const container = app.getContainer();
+    const emitter = container.resolve(EventEmitterService);
+    const redis = container.resolve(RedisAccessor).get();
+    redis.echoPublishedMessages = true;
+
+    const deliveries: unknown[] = [];
+    emitter.on('local.once', (payload) => deliveries.push(payload));
+
+    await emitter.emit('local.once', { id: 'one' });
+
+    expect(deliveries).toEqual([{ id: 'one' }]);
+    await app.close();
+  });
+
+  it('dispatches remote and legacy envelopes', async () => {
+    const app = await createApplication(EventTestModule);
+    const container = app.getContainer();
+    const emitter = container.resolve(EventEmitterService);
+    const redis = container.resolve(RedisAccessor).get();
+    const deliveries: unknown[] = [];
+    emitter.on('remote.compatible', (payload) => deliveries.push(payload));
+
+    redis.emit(
+      'test:events',
+      JSON.stringify({
+        event: 'remote.compatible',
+        payload: { source: 'remote' },
+        emittedAt: new Date().toISOString(),
+        sourceId: 'another-process',
+      }),
+    );
+    redis.emit(
+      'test:events',
+      JSON.stringify({
+        event: 'remote.compatible',
+        payload: { source: 'legacy' },
+        emittedAt: new Date().toISOString(),
+      }),
+    );
+
+    expect(deliveries).toEqual([{ source: 'remote' }, { source: 'legacy' }]);
     await app.close();
   });
 
