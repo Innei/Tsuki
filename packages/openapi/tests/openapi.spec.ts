@@ -254,4 +254,32 @@ describe('createOpenApiDocument · Zod 4 schema lowering', () => {
       exclusiveMaximum: 1,
     });
   });
+
+  it('preserves top-level Zod 4 format constructors', () => {
+    class TopLevelFormatDto extends createZodSchemaDto(
+      z.object({
+        email: z.email(),
+        url: z.url(),
+        uuid: z.uuid(),
+        count: z.int(),
+      }),
+      { name: 'TopLevelFormatDto' },
+    ) {}
+
+    @Controller('top-level-formats')
+    class TopLevelFormatController {
+      @Post('/')
+      create(@Body() _body: TopLevelFormatDto) {
+        void _body;
+      }
+    }
+
+    const doc = buildDocFromController(TopLevelFormatController);
+    const properties = (doc.components?.schemas?.TopLevelFormatDto as any).properties;
+
+    expect(properties.email).toEqual({ type: 'string', format: 'email' });
+    expect(properties.url).toEqual({ type: 'string', format: 'uri' });
+    expect(properties.uuid).toEqual({ type: 'string', format: 'uuid' });
+    expect(properties.count).toEqual({ type: 'integer' });
+  });
 });

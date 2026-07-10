@@ -769,7 +769,7 @@ function unwrapSchema(schema: ZodType): {
 function mapZodType(schema: ZodType): SchemaConversionResult {
   const typeName = getTypeName(schema);
 
-  if (schema instanceof ZodString) {
+  if (schema instanceof ZodString || typeName === 'string') {
     return {
       schema: buildStringSchema(schema),
       optional: false,
@@ -887,11 +887,11 @@ function mapZodType(schema: ZodType): SchemaConversionResult {
   };
 }
 
-function buildStringSchema(schema: ZodString): Record<string, unknown> {
+function buildStringSchema(schema: ZodType): Record<string, unknown> {
   const jsonSchema: Record<string, unknown> = { type: 'string' };
 
   const def = getDefinition(schema);
-  const checks: Array<Record<string, any>> = def.checks ?? [];
+  const checks: Array<Record<string, any>> = [...(def.checks ?? []), ...(def.check ? [def] : [])];
 
   for (const rawCheck of checks) {
     const check = getCheckDefinition(rawCheck);
@@ -942,7 +942,7 @@ function buildNumberSchema(schema: ZodNumber): Record<string, unknown> {
   const jsonSchema: Record<string, unknown> = { type: 'number' };
 
   const def = getDefinition(schema);
-  const checks: Array<Record<string, any>> = def.checks ?? [];
+  const checks: Array<Record<string, any>> = [...(def.checks ?? []), ...(def.check ? [def] : [])];
 
   for (const rawCheck of checks) {
     const check = getCheckDefinition(rawCheck);
