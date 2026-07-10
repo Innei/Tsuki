@@ -32,22 +32,26 @@ Publishing remains best-effort: a local dispatch can succeed even when Redis pub
 
 ## Provider Lifecycle
 
-Lifecycle initialization must resolve the provider by its registration token rather than by its implementation constructor.
+Lifecycle initialization must resolve a provider by its registration token rather than by its implementation constructor. Lifecycle ownership is limited to providers canonically registered through `Module.providers`; registrations supplied only through `ApplicationOptions.container` are externally owned and remain the caller's lifecycle responsibility.
 
 The application records lifecycle candidates with enough information to resolve the canonical instance after all modules are registered:
 
-| Provider form                        | Initialization behavior                                                         |
-| ------------------------------------ | ------------------------------------------------------------------------------- |
-| Constructor provider                 | Resolve the constructor token and invoke hooks once                             |
-| Singleton `useClass`                 | Resolve the declared `provide` token and invoke hooks once                      |
-| `useValue`                           | Use the supplied instance and invoke hooks once                                 |
-| Singleton `useFactory`               | Resolve the factory token during initialization, then inspect and invoke hooks  |
-| `useExisting`                        | Reuse the target instance; instance-level deduplication prevents repeated hooks |
-| Transient `useClass` or `useFactory` | No application lifecycle guarantee because no canonical instance exists         |
+| Provider form                             | Initialization behavior                                                                     |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Constructor provider                      | Resolve the constructor token and invoke hooks once                                         |
+| Singleton `useClass`                      | Resolve the declared `provide` token and invoke hooks once                                  |
+| `useValue`                                | Use the supplied instance and invoke hooks once                                             |
+| Singleton `useFactory`                    | Resolve the factory token during initialization, then inspect and invoke hooks              |
+| `useExisting` to a module-owned singleton | Reuse the canonical target; instance-level deduplication prevents repeated hooks            |
+| Transient `useClass` or `useFactory`      | No application lifecycle because no canonical instance exists                               |
+| Alias to a module-owned transient         | No application lifecycle; classification does not materialize the transient                 |
+| Alias to an external-container-only token | No application lifecycle; the externally owned target remains usable for DI and APP runtime |
+
+Module provider registration metadata records each token's generation and final lifetime or alias target. A lifecycle candidate resolves only when its captured generation is still the final module registration and the final alias chain terminates in a module-owned singleton. An absent terminal token is external, and an alias cycle is not materialized. This classification does not inspect container internals or infer lifetime by resolving instances.
 
 Hook deduplication is instance-based. An object reachable through multiple aliases receives each lifecycle hook once. Shutdown ordering remains reverse registration order.
 
-All singleton factory providers are materialized during lifecycle discovery because the returned value is the only source of lifecycle metadata. Transient factories remain lazy.
+All final, module-owned singleton factory providers are materialized during lifecycle discovery because the returned value is the only source of lifecycle metadata. Transient factories and external-container registrations remain caller-owned and lazy from Tsuki's lifecycle perspective.
 
 ## Shared Route Paths
 

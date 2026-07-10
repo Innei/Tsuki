@@ -1583,7 +1583,7 @@ describe('Lifecycle hooks integration', () => {
     expect(calls).toEqual(['factory:destroy', 'value:destroy', 'class:destroy']);
   });
 
-  it('runs lifecycle hooks once for regular aliases to custom-container singletons', async () => {
+  it('does not adopt lifecycle ownership through regular aliases to custom-container values', async () => {
     const CUSTOM_CONTAINER_TOKEN = Symbol('CUSTOM_CONTAINER_TOKEN');
     const ALIAS_TOKEN = Symbol('ALIAS_TOKEN');
     const calls: string[] = [];
@@ -1603,12 +1603,12 @@ describe('Lifecycle hooks integration', () => {
       container: applicationContainer,
     });
 
-    expect(calls).toEqual(['init']);
+    expect(calls).toEqual([]);
     expect(app.getContainer().resolve(ALIAS_TOKEN)).toBe(lifecycleProvider);
     expect(app.getContainer().resolve(CUSTOM_CONTAINER_TOKEN)).toBe(lifecycleProvider);
 
     await app.close('custom-container-alias');
-    expect(calls).toEqual(['init', 'destroy']);
+    expect(calls).toEqual([]);
   });
 
   it('runs lifecycle hooks for APP useExisting aliases to singleton middleware definitions', async () => {
@@ -1684,6 +1684,65 @@ describe('Lifecycle hooks integration', () => {
       'destroy',
       'shutdown:singleton-middleware-alias',
     ]);
+  });
+
+  it('does not adopt lifecycle ownership through APP aliases to custom-container providers', async () => {
+    const EXTERNAL_GUARD_TOKEN = Symbol('EXTERNAL_GUARD_TOKEN');
+    const calls: string[] = [];
+
+    @injectable()
+    class ExternalGuard
+      implements CanActivate, OnModuleInit, OnApplicationBootstrap, OnModuleDestroy
+    {
+      canActivate() {
+        calls.push('activate');
+        return true;
+      }
+      onModuleInit() {
+        calls.push('init');
+      }
+      onApplicationBootstrap() {
+        calls.push('bootstrap');
+      }
+      onModuleDestroy() {
+        calls.push('destroy');
+      }
+    }
+
+    const applicationContainer = container.createChildContainer();
+    applicationContainer.register(EXTERNAL_GUARD_TOKEN, { useClass: ExternalGuard });
+
+    @Controller('external-guard')
+    class ExternalGuardController {
+      @Get('/')
+      ping() {
+        return 'pong';
+      }
+    }
+
+    @Module({
+      controllers: [ExternalGuardController],
+      providers: [
+        {
+          provide: APP_GUARD as unknown as Constructor,
+          useExisting: EXTERNAL_GUARD_TOKEN,
+        },
+      ],
+    })
+    class ExternalGuardModule {}
+
+    const app = await createApplication(ExternalGuardModule, {
+      container: applicationContainer,
+    });
+    expect(calls).toEqual([]);
+
+    const response = await app.getInstance().fetch(new Request('http://localhost/external-guard'));
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe('pong');
+    expect(calls).toEqual(['activate']);
+
+    await app.close('external-guard');
+    expect(calls).toEqual(['activate']);
   });
 
   it('does not partially run lifecycle hooks for transient APP middleware aliases', async () => {
@@ -1792,6 +1851,101 @@ describe('Lifecycle hooks integration', () => {
 
     await app.close('transient-alias');
     expect(calls).toEqual([]);
+  });
+
+  it('ignores stale singleton lifecycle candidates replaced by a final transient', async () => {
+    const SHARED_TOKEN = Symbol('SHARED_TOKEN');
+    const calls: string[] = [];
+    let instances = 0;
+
+    @injectable()
+    class EarlierSingleton implements OnModuleInit, OnModuleDestroy {
+      onModuleInit() {
+        calls.push('earlier:init');
+      }
+      onModuleDestroy() {
+        calls.push('earlier:destroy');
+      }
+    }
+
+    @injectable()
+    class FinalTransient implements OnModuleInit, OnModuleDestroy {
+      constructor() {
+        instances += 1;
+      }
+      onModuleInit() {
+        calls.push('transient:init');
+      }
+      onModuleDestroy() {
+        calls.push('transient:destroy');
+      }
+    }
+
+    @Module({
+      providers: [{ provide: SHARED_TOKEN, useClass: EarlierSingleton }],
+    })
+    class EarlierSingletonModule {}
+
+    @Module({
+      imports: [EarlierSingletonModule],
+      providers: [
+        {
+          provide: SHARED_TOKEN,
+          useClass: FinalTransient,
+          singleton: false,
+        },
+      ],
+    })
+    class FinalTransientModule {}
+
+    const app = await createApplication(FinalTransientModule);
+    expect(calls).toEqual([]);
+    expect(instances).toBe(0);
+
+    const first = app.getContainer().resolve<FinalTransient>(SHARED_TOKEN);
+    const second = app.getContainer().resolve<FinalTransient>(SHARED_TOKEN);
+    expect(first).not.toBe(second);
+    expect(instances).toBe(2);
+
+    await app.close('final-transient');
+    expect(calls).toEqual([]);
+  });
+
+  it('runs lifecycle only for the final singleton registration', async () => {
+    const SHARED_TOKEN = Symbol('SHARED_TOKEN');
+    const calls: string[] = [];
+    const earlierValue = {
+      onModuleInit: () => calls.push('earlier:init'),
+      onModuleDestroy: () => calls.push('earlier:destroy'),
+    };
+
+    @injectable()
+    class FinalSingleton implements OnModuleInit, OnModuleDestroy {
+      onModuleInit() {
+        calls.push('final:init');
+      }
+      onModuleDestroy() {
+        calls.push('final:destroy');
+      }
+    }
+
+    @Module({
+      providers: [{ provide: SHARED_TOKEN, useValue: earlierValue }],
+    })
+    class EarlierValueModule {}
+
+    @Module({
+      imports: [EarlierValueModule],
+      providers: [{ provide: SHARED_TOKEN, useClass: FinalSingleton }],
+    })
+    class FinalSingletonModule {}
+
+    const app = await createApplication(FinalSingletonModule);
+    expect(calls).toEqual(['final:init']);
+    expect(app.getContainer().resolve(SHARED_TOKEN)).toBeInstanceOf(FinalSingleton);
+
+    await app.close('final-singleton');
+    expect(calls).toEqual(['final:init', 'final:destroy']);
   });
 
   it('does not run lifecycle hooks for APP useExisting aliases to transient enhancers', async () => {

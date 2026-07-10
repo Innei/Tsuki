@@ -76,7 +76,15 @@ type ProviderConfig =
     };
 
 type LifecycleResolver = () => unknown;
-type ProviderLifecycleClassification = 'resolvable' | 'transient' | 'alias-cycle';
+type ProviderLifecycleClassification =
+  | 'module-singleton'
+  | 'module-transient'
+  | 'external'
+  | 'alias-cycle';
+type ModuleProviderRegistration =
+  | { generation: number; kind: 'singleton' }
+  | { generation: number; kind: 'transient' }
+  | { generation: number; kind: 'alias'; target: InjectionToken };
 
 const GENERATED_RESPONSE = Symbol.for('hono.framework.generatedResponse');
 
@@ -148,8 +156,11 @@ export class HonoHttpApplication {
   private readonly middlewareLogger: PrettyLogger;
   private readonly moduleName: string;
   private readonly instances = new Map<Constructor, unknown>();
-  private readonly transientProviderTokens = new Set<InjectionToken>();
-  private readonly providerAliasTargets = new Map<InjectionToken, InjectionToken>();
+  private readonly moduleProviderRegistrations = new Map<
+    InjectionToken,
+    ModuleProviderRegistration
+  >();
+  private providerRegistrationGeneration = 0;
   private readonly moduleInitCalled = new Set<unknown>();
   private readonly moduleDestroyHooks: OnModuleDestroy[] = [];
   private readonly applicationBootstrapHooks: OnApplicationBootstrap[] = [];
@@ -303,8 +314,12 @@ export class HonoHttpApplication {
   private registerProvider(provider: ProviderConfig): void {
     // Simple case: Constructor as provider
     if (this.isConstructorToken(provider)) {
-      this.registerSingleton(provider as Constructor);
-      this.enqueueLifecycleResolver(
+      const token = provider as Constructor;
+      const generation = this.trackProviderLifetime(token, true);
+      this.registerSingleton(token);
+      this.enqueueModuleProviderLifecycleResolver(
+        token,
+        generation,
         () => this.getProviderInstance(provider as Constructor),
         provider as Constructor,
       );
@@ -371,7 +386,7 @@ export class HonoHttpApplication {
     if ('useExisting' in config && config.useExisting) {
       this.enqueueLifecycleResolver(
         () => {
-          if (this.classifyProviderForLifecycle(config.useExisting) !== 'resolvable') {
+          if (this.classifyProviderForLifecycle(config.useExisting) !== 'module-singleton') {
             return undefined;
           }
           const value = this.container.resolve(config.useExisting as any);
@@ -616,12 +631,11 @@ export class HonoHttpApplication {
     }
 
     if ('useExisting' in config && config.useExisting) {
-      this.registerExistingProvider(provideToken, config.useExisting);
-      this.enqueueLifecycleResolver(
+      const generation = this.registerExistingProvider(provideToken, config.useExisting);
+      this.enqueueModuleProviderLifecycleResolver(
+        provideToken,
+        generation,
         () => {
-          if (this.classifyProviderForLifecycle(provideToken) !== 'resolvable') {
-            return undefined;
-          }
           return this.container.resolve(provideToken as any);
         },
         undefined,
@@ -631,21 +645,29 @@ export class HonoHttpApplication {
     }
 
     if ('useValue' in config) {
-      this.registerValueProvider(provideToken, config.useValue);
-      this.enqueueLifecycleResolver(() => config.useValue, undefined, true);
+      const generation = this.registerValueProvider(provideToken, config.useValue);
+      this.enqueueModuleProviderLifecycleResolver(
+        provideToken,
+        generation,
+        () => config.useValue,
+        undefined,
+        true,
+      );
       return;
     }
 
     if ('useFactory' in config && config.useFactory) {
       const isSingleton = config.singleton !== false; // default true
-      this.registerFactoryProvider(
+      const generation = this.registerFactoryProvider(
         provideToken,
         config.useFactory,
         config.inject ?? [],
         isSingleton,
       );
       if (isSingleton) {
-        this.enqueueLifecycleResolver(
+        this.enqueueModuleProviderLifecycleResolver(
+          provideToken,
+          generation,
           () => this.container.resolve(provideToken as any),
           undefined,
           true,
@@ -720,7 +742,7 @@ export class HonoHttpApplication {
     useClass: Constructor,
     isSingleton: boolean,
   ): void {
-    this.trackProviderLifetime(token, isSingleton);
+    const generation = this.trackProviderLifetime(token, isSingleton);
     if (isSingleton) {
       this.container.registerSingleton(token, useClass);
     } else {
@@ -733,28 +755,34 @@ export class HonoHttpApplication {
       colors.green(`+${performance.now().toFixed(2)}ms`),
     );
     if (isSingleton) {
-      this.enqueueLifecycleResolver(() => this.container.resolve(token as any), useClass);
+      this.enqueueModuleProviderLifecycleResolver(
+        token,
+        generation,
+        () => this.container.resolve(token as any),
+        useClass,
+      );
     }
   }
 
   /**
    * Register an existing provider (alias)
    */
-  private registerExistingProvider(token: InjectionToken, useExisting: InjectionToken): void {
-    this.trackProviderAlias(token, useExisting);
+  private registerExistingProvider(token: InjectionToken, useExisting: InjectionToken): number {
+    const generation = this.trackProviderAlias(token, useExisting);
     this.container.register(token, { useToken: useExisting } as any);
     this.diLogger.debug(
       'Registered existing provider alias',
       colors.yellow(String(token)),
       colors.green(`+${performance.now().toFixed(2)}ms`),
     );
+    return generation;
   }
 
   /**
    * Register a value provider
    */
-  private registerValueProvider(token: InjectionToken, useValue: unknown): void {
-    this.trackProviderLifetime(token, true);
+  private registerValueProvider(token: InjectionToken, useValue: unknown): number {
+    const generation = this.trackProviderLifetime(token, true);
     this.container.register(token, { useValue } as any);
     const name = this.formatTokenName(token as unknown as Constructor);
     this.diLogger.debug(
@@ -762,6 +790,7 @@ export class HonoHttpApplication {
       colors.yellow(name),
       colors.green(`+${performance.now().toFixed(2)}ms`),
     );
+    return generation;
   }
 
   /**
@@ -772,8 +801,8 @@ export class HonoHttpApplication {
     useFactory: (...args: any[]) => unknown,
     inject: InjectionToken[],
     isSingleton: boolean,
-  ): void {
-    this.trackProviderLifetime(token, isSingleton);
+  ): number {
+    const generation = this.trackProviderLifetime(token, isSingleton);
     const factory = (c: DependencyContainer) => {
       const deps = inject.map((t) => c.resolve(t as any));
       return useFactory(...deps);
@@ -801,20 +830,22 @@ export class HonoHttpApplication {
       colors.yellow(String(token)),
       colors.green(`+${performance.now().toFixed(2)}ms`),
     );
+    return generation;
   }
 
-  private trackProviderLifetime(token: InjectionToken, isSingleton: boolean): void {
-    this.providerAliasTargets.delete(token);
-    if (isSingleton) {
-      this.transientProviderTokens.delete(token);
-    } else {
-      this.transientProviderTokens.add(token);
-    }
+  private trackProviderLifetime(token: InjectionToken, isSingleton: boolean): number {
+    const generation = ++this.providerRegistrationGeneration;
+    this.moduleProviderRegistrations.set(token, {
+      generation,
+      kind: isSingleton ? 'singleton' : 'transient',
+    });
+    return generation;
   }
 
-  private trackProviderAlias(token: InjectionToken, target: InjectionToken): void {
-    this.transientProviderTokens.delete(token);
-    this.providerAliasTargets.set(token, target);
+  private trackProviderAlias(token: InjectionToken, target: InjectionToken): number {
+    const generation = ++this.providerRegistrationGeneration;
+    this.moduleProviderRegistrations.set(token, { generation, kind: 'alias', target });
+    return generation;
   }
 
   private classifyProviderForLifecycle(token: InjectionToken): ProviderLifecycleClassification {
@@ -824,10 +855,33 @@ export class HonoHttpApplication {
     while (true) {
       if (visited.has(current)) return 'alias-cycle';
       visited.add(current);
-      if (this.transientProviderTokens.has(current)) return 'transient';
-      if (!this.providerAliasTargets.has(current)) return 'resolvable';
-      current = this.providerAliasTargets.get(current)!;
+      const registration = this.moduleProviderRegistrations.get(current);
+      if (!registration) return 'external';
+      if (registration.kind === 'singleton') return 'module-singleton';
+      if (registration.kind === 'transient') return 'module-transient';
+      current = registration.target;
     }
+  }
+
+  private enqueueModuleProviderLifecycleResolver(
+    token: InjectionToken,
+    generation: number,
+    resolver: LifecycleResolver,
+    metatype?: Constructor,
+    inspectResult = false,
+  ): void {
+    this.enqueueLifecycleResolver(
+      () => {
+        const registration = this.moduleProviderRegistrations.get(token);
+        if (registration?.generation !== generation) return undefined;
+        if (this.classifyProviderForLifecycle(token) !== 'module-singleton') {
+          return undefined;
+        }
+        return resolver();
+      },
+      metatype,
+      inspectResult,
+    );
   }
 
   private registerLifecycleHandlers(instance: unknown): void {

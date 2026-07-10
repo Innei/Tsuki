@@ -102,10 +102,19 @@ Providers implementing these interfaces have their hooks called automatically:
 4. `onModuleDestroy()` — teardown
 5. `onApplicationShutdown(signal?)` — final step
 
-Lifecycle hooks apply to constructor providers, values, aliases, and singleton
-`useClass`/`useFactory` providers. Singleton factories are materialized during
-application initialization so their hooks can be discovered. Transient providers
-do not have an application lifecycle because they do not have one canonical instance.
+Lifecycle hooks apply only to providers canonically owned by the final
+`Module.providers` registration for a token. This includes constructor providers,
+values, aliases to module-owned singletons, and singleton `useClass`/`useFactory`
+providers. Singleton factories are materialized during application initialization
+so their hooks can be discovered. If a token is registered more than once across
+imports and the root module, only its final registration participates in lifecycle.
+
+Transient providers do not have an application lifecycle because they do not have
+one canonical instance. Registrations supplied only through
+`ApplicationOptions.container` are externally owned: Tsuki can resolve and use them
+for dependency injection or APP enhancers, but it does not invoke their lifecycle
+hooks. The caller that supplied the container remains responsible for their setup
+and teardown.
 
 ## License
 
