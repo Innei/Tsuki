@@ -282,4 +282,28 @@ describe('createOpenApiDocument · Zod 4 schema lowering', () => {
     expect(properties.uuid).toEqual({ type: 'string', format: 'uuid' });
     expect(properties.count).toEqual({ type: 'integer' });
   });
+
+  it('normalizes top-level and chained Zod date-time formats', () => {
+    class DateTimeFormatDto extends createZodSchemaDto(
+      z.object({
+        topLevel: z.iso.datetime(),
+        chained: z.string().datetime(),
+      }),
+      { name: 'DateTimeFormatDto' },
+    ) {}
+
+    @Controller('date-time-formats')
+    class DateTimeFormatController {
+      @Post('/')
+      create(@Body() _body: DateTimeFormatDto) {
+        void _body;
+      }
+    }
+
+    const doc = buildDocFromController(DateTimeFormatController);
+    const properties = (doc.components?.schemas?.DateTimeFormatDto as any).properties;
+
+    expect(properties.topLevel).toEqual({ type: 'string', format: 'date-time' });
+    expect(properties.chained).toEqual({ type: 'string', format: 'date-time' });
+  });
 });

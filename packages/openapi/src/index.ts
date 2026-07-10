@@ -924,6 +924,8 @@ function buildStringSchema(schema: ZodType): Record<string, unknown> {
       case 'string_format': {
         if (check.format === 'url') {
           jsonSchema.format = 'uri';
+        } else if (check.format === 'datetime') {
+          jsonSchema.format = 'date-time';
         } else if (typeof check.format === 'string') {
           jsonSchema.format = check.format;
         }

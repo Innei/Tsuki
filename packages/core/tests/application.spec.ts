@@ -54,7 +54,7 @@ import {
 } from '@tsuki-hono/common';
 import { createApplication, HonoHttpApplication } from '@tsuki-hono/core';
 import type { Context, Next } from 'hono';
-import { injectable } from 'tsyringe';
+import { container, injectable } from 'tsyringe';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 
@@ -1583,11 +1583,43 @@ describe('Lifecycle hooks integration', () => {
     expect(calls).toEqual(['factory:destroy', 'value:destroy', 'class:destroy']);
   });
 
+  it('runs lifecycle hooks once for regular aliases to custom-container singletons', async () => {
+    const CUSTOM_CONTAINER_TOKEN = Symbol('CUSTOM_CONTAINER_TOKEN');
+    const ALIAS_TOKEN = Symbol('ALIAS_TOKEN');
+    const calls: string[] = [];
+    const lifecycleProvider = {
+      onModuleInit: () => calls.push('init'),
+      onModuleDestroy: () => calls.push('destroy'),
+    };
+    const applicationContainer = container.createChildContainer();
+    applicationContainer.register(CUSTOM_CONTAINER_TOKEN, { useValue: lifecycleProvider });
+
+    @Module({
+      providers: [{ provide: ALIAS_TOKEN, useExisting: CUSTOM_CONTAINER_TOKEN }],
+    })
+    class CustomContainerAliasModule {}
+
+    const app = await createApplication(CustomContainerAliasModule, {
+      container: applicationContainer,
+    });
+
+    expect(calls).toEqual(['init']);
+    expect(app.getContainer().resolve(ALIAS_TOKEN)).toBe(lifecycleProvider);
+    expect(app.getContainer().resolve(CUSTOM_CONTAINER_TOKEN)).toBe(lifecycleProvider);
+
+    await app.close('custom-container-alias');
+    expect(calls).toEqual(['init', 'destroy']);
+  });
+
   it('runs lifecycle hooks for APP useExisting aliases to singleton middleware definitions', async () => {
     const MIDDLEWARE_TOKEN = Symbol('MIDDLEWARE_TOKEN');
     const calls: string[] = [];
 
-    const lifecycleMiddleware: HttpMiddleware & OnModuleInit & OnModuleDestroy = {
+    const lifecycleMiddleware: HttpMiddleware &
+      OnModuleInit &
+      OnApplicationBootstrap &
+      OnModuleDestroy &
+      OnApplicationShutdown = {
       async use(_context, next) {
         calls.push('middleware:before');
         await next();
@@ -1596,8 +1628,14 @@ describe('Lifecycle hooks integration', () => {
       onModuleInit() {
         calls.push('init');
       },
+      onApplicationBootstrap() {
+        calls.push('bootstrap');
+      },
       onModuleDestroy() {
         calls.push('destroy');
+      },
+      onApplicationShutdown(signal) {
+        calls.push(`shutdown:${signal ?? 'none'}`);
       },
     };
 
@@ -1628,21 +1666,96 @@ describe('Lifecycle hooks integration', () => {
     class SingletonMiddlewareAliasModule {}
 
     const app = await createApplication(SingletonMiddlewareAliasModule);
-    expect(calls).toEqual(['init']);
+    expect(calls).toEqual(['init', 'bootstrap']);
 
     const response = await app
       .getInstance()
       .fetch(new Request('http://localhost/singleton-middleware'));
     expect(response.status).toBe(200);
     expect(await response.text()).toBe('pong');
-    expect(calls).toEqual(['init', 'middleware:before', 'middleware:after']);
+    expect(calls).toEqual(['init', 'bootstrap', 'middleware:before', 'middleware:after']);
 
     await app.close('singleton-middleware-alias');
-    expect(calls).toEqual(['init', 'middleware:before', 'middleware:after', 'destroy']);
+    expect(calls).toEqual([
+      'init',
+      'bootstrap',
+      'middleware:before',
+      'middleware:after',
+      'destroy',
+      'shutdown:singleton-middleware-alias',
+    ]);
+  });
+
+  it('does not partially run lifecycle hooks for transient APP middleware aliases', async () => {
+    const TRANSIENT_MIDDLEWARE_TOKEN = Symbol('TRANSIENT_MIDDLEWARE_TOKEN');
+    const TRANSIENT_MIDDLEWARE_ALIAS = Symbol('TRANSIENT_MIDDLEWARE_ALIAS');
+    const calls: string[] = [];
+
+    @Middleware({ path: '/transient-middleware' })
+    @injectable()
+    class TransientMiddleware
+      implements HttpMiddleware, OnModuleInit, OnApplicationBootstrap, OnModuleDestroy
+    {
+      async use(_context: Context, next: Next) {
+        calls.push('use');
+        await next();
+      }
+      onModuleInit() {
+        calls.push('init');
+      }
+      onApplicationBootstrap() {
+        calls.push('bootstrap');
+      }
+      onModuleDestroy() {
+        calls.push('destroy');
+      }
+    }
+
+    @Controller('transient-middleware')
+    class TransientMiddlewareController {
+      @Get('/')
+      ping() {
+        return 'pong';
+      }
+    }
+
+    @Module({
+      controllers: [TransientMiddlewareController],
+      providers: [
+        {
+          provide: TRANSIENT_MIDDLEWARE_TOKEN,
+          useClass: TransientMiddleware,
+          singleton: false,
+        },
+        {
+          provide: TRANSIENT_MIDDLEWARE_ALIAS,
+          useExisting: TRANSIENT_MIDDLEWARE_TOKEN,
+        },
+        {
+          provide: APP_MIDDLEWARE as unknown as Constructor,
+          useExisting: TRANSIENT_MIDDLEWARE_ALIAS,
+        },
+      ],
+    })
+    class TransientMiddlewareAliasModule {}
+
+    const app = await createApplication(TransientMiddlewareAliasModule);
+    expect(calls).toEqual([]);
+
+    const response = await app
+      .getInstance()
+      .fetch(new Request('http://localhost/transient-middleware'));
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe('pong');
+    expect(calls).toEqual(['use']);
+
+    await app.close('transient-middleware-alias');
+    expect(calls).toEqual(['use']);
   });
 
   it('does not run lifecycle hooks for regular useExisting aliases to transient providers', async () => {
     const TRANSIENT_TOKEN = Symbol('TRANSIENT_TOKEN');
+    const INTERMEDIATE_ALIAS_TOKEN = Symbol('INTERMEDIATE_ALIAS_TOKEN');
     const ALIAS_TOKEN = Symbol('ALIAS_TOKEN');
     const calls: string[] = [];
 
@@ -1662,7 +1775,8 @@ describe('Lifecycle hooks integration', () => {
     @Module({
       providers: [
         { provide: TRANSIENT_TOKEN, useClass: TransientLifecycle, singleton: false },
-        { provide: ALIAS_TOKEN, useExisting: TRANSIENT_TOKEN },
+        { provide: INTERMEDIATE_ALIAS_TOKEN, useExisting: TRANSIENT_TOKEN },
+        { provide: ALIAS_TOKEN, useExisting: INTERMEDIATE_ALIAS_TOKEN },
       ],
     })
     class TransientAliasModule {}

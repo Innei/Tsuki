@@ -76,6 +76,7 @@ type ProviderConfig =
     };
 
 type LifecycleResolver = () => unknown;
+type ProviderLifecycleClassification = 'resolvable' | 'transient' | 'alias-cycle';
 
 const GENERATED_RESPONSE = Symbol.for('hono.framework.generatedResponse');
 
@@ -370,7 +371,9 @@ export class HonoHttpApplication {
     if ('useExisting' in config && config.useExisting) {
       this.enqueueLifecycleResolver(
         () => {
-          if (this.isTransientProviderToken(config.useExisting)) return undefined;
+          if (this.classifyProviderForLifecycle(config.useExisting) !== 'resolvable') {
+            return undefined;
+          }
           const value = this.container.resolve(config.useExisting as any);
           return enhancerType === 'middleware'
             ? (this.extractMiddlewareLifecycleTarget(value) ?? value)
@@ -552,7 +555,6 @@ export class HonoHttpApplication {
         metadataSource ?? (value.handler as unknown as Constructor),
       );
       const mergedMetadata = this.mergeMiddlewareMetadata(value, decoratorMetadata);
-      this.registerLifecycleHandlers(value.handler);
       return this.normalizeMiddlewareDefinition({
         handler: value.handler,
         path: mergedMetadata.path,
@@ -564,7 +566,6 @@ export class HonoHttpApplication {
       const decoratorMetadata = this.extractMiddlewareMetadata(
         metadataSource ?? ((value as HttpMiddleware).constructor as Constructor),
       );
-      this.registerLifecycleHandlers(value);
       return this.normalizeMiddlewareDefinition({
         handler: value,
         path: decoratorMetadata.path,
@@ -616,6 +617,16 @@ export class HonoHttpApplication {
 
     if ('useExisting' in config && config.useExisting) {
       this.registerExistingProvider(provideToken, config.useExisting);
+      this.enqueueLifecycleResolver(
+        () => {
+          if (this.classifyProviderForLifecycle(provideToken) !== 'resolvable') {
+            return undefined;
+          }
+          return this.container.resolve(provideToken as any);
+        },
+        undefined,
+        true,
+      );
       return;
     }
 
@@ -806,18 +817,17 @@ export class HonoHttpApplication {
     this.providerAliasTargets.set(token, target);
   }
 
-  private isTransientProviderToken(token: InjectionToken): boolean {
+  private classifyProviderForLifecycle(token: InjectionToken): ProviderLifecycleClassification {
     const visited = new Set<InjectionToken>();
     let current = token;
 
-    while (!visited.has(current)) {
+    while (true) {
+      if (visited.has(current)) return 'alias-cycle';
       visited.add(current);
-      if (this.transientProviderTokens.has(current)) return true;
-      if (!this.providerAliasTargets.has(current)) return false;
+      if (this.transientProviderTokens.has(current)) return 'transient';
+      if (!this.providerAliasTargets.has(current)) return 'resolvable';
       current = this.providerAliasTargets.get(current)!;
     }
-
-    return false;
   }
 
   private registerLifecycleHandlers(instance: unknown): void {
