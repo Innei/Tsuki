@@ -1,6 +1,7 @@
 /* c8 ignore file */
 import type { Constructor, RouteParamMetadataItem } from '@tsuki-hono/common';
 import {
+  buildRoutePath,
   getApiDoc,
   getApiTags,
   getControllerMetadata,
@@ -184,7 +185,12 @@ export function createOpenApiDocument(
     const classDoc = getApiDoc(controller);
 
     for (const route of routes) {
-      const fullPath = normalizePath(options.globalPrefix, controllerMetadata.prefix, route.path);
+      const fullPath = buildRoutePath({
+        bypassGlobalPrefix: controllerMetadata.bypassGlobalPrefix,
+        controllerPrefix: controllerMetadata.prefix,
+        globalPrefix: options.globalPrefix,
+        routePath: route.path,
+      });
       const openApiPath = convertHonoPathToOpenApi(fullPath);
       const method = route.method.toLowerCase();
 
@@ -448,20 +454,6 @@ function resolveOperationId(base: string, counter: Map<string, number>): string 
 
 function sanitizeOperationId(value: string): string {
   return value.replaceAll(/\W/g, '_');
-}
-
-function normalizePath(...segments: Array<string | undefined | null>): string {
-  const filtered = segments
-    .filter((segment): segment is string => Boolean(segment && segment.trim().length > 0))
-    .map((segment) => segment.trim())
-    .map((segment) => segment.replaceAll(/^\/+|\/+$|\s+/g, ''))
-    .filter((segment) => segment.length > 0);
-
-  if (filtered.length === 0) {
-    return '/';
-  }
-
-  return `/${filtered.join('/')}`.replaceAll(/\/+/g, '/');
 }
 
 function convertHonoPathToOpenApi(path: string): string {

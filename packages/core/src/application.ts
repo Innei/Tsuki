@@ -30,6 +30,7 @@ import {
   APP_MIDDLEWARE,
   APP_PIPE,
   BadRequestException,
+  buildRoutePath,
   createLogger,
   ForbiddenException,
   getControllerMetadata,
@@ -1077,30 +1078,12 @@ export class HonoHttpApplication {
     controller: ReturnType<typeof getControllerMetadata>,
     routePath: string,
   ): string {
-    const globalPrefix = this.options.globalPrefix ?? '';
-    const pieces = [routePath];
-    if (controller.prefix) {
-      pieces.unshift(controller.prefix);
-    }
-    if (!controller.bypassGlobalPrefix && globalPrefix) {
-      pieces.unshift(globalPrefix);
-    }
-
-    if (pieces.length === 0) {
-      return '/';
-    }
-
-    const normalized = pieces
-      .map((segment) => segment?.trim())
-      .filter(Boolean)
-      .map((segment) => (segment!.startsWith('/') ? segment : `/${segment}`));
-
-    const joined = normalized.join('').replaceAll(/[/\\]+/g, '/');
-    if (joined.length > 1 && joined.endsWith('/')) {
-      return joined.slice(0, -1);
-    }
-
-    return joined || '/';
+    return buildRoutePath({
+      bypassGlobalPrefix: controller.bypassGlobalPrefix,
+      controllerPrefix: controller.prefix,
+      globalPrefix: this.options.globalPrefix,
+      routePath,
+    });
   }
 
   private async executeGuards(

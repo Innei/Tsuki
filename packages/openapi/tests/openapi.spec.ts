@@ -22,6 +22,26 @@ function getOperation(doc: ReturnType<typeof createOpenApiDocument>, path: strin
   return operation as OpenApiOperation;
 }
 
+it('matches runtime paths when a controller bypasses the global prefix', () => {
+  @Controller({ prefix: 'static', bypassGlobalPrefix: true })
+  class StaticController {
+    @Get('/asset')
+    asset() {}
+  }
+
+  @Module({ controllers: [StaticController] })
+  class StaticModule {}
+
+  const doc = createOpenApiDocument(StaticModule, {
+    title: 'test',
+    version: '0.0.0',
+    globalPrefix: '/api',
+  });
+
+  expect(doc.paths['/static/asset']).toBeDefined();
+  expect(doc.paths['/api/static/asset']).toBeUndefined();
+});
+
 describe('createOpenApiDocument · Zod 4 schema lowering', () => {
   describe('wrapper unwrapping (lowercase def.type)', () => {
     it('treats optional()/default()/catch() as non-required and preserves nullable', () => {

@@ -14,3 +14,4 @@ export * from './http-exception';
 export * from './interfaces';
 export * from './logger';
 export * from './pipes/zod-validation.pipe';
+export * from './utils/route-path';
