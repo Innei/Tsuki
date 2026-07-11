@@ -54,7 +54,7 @@ import {
 } from '@tsuki-hono/common';
 import { createApplication, HonoHttpApplication } from '@tsuki-hono/core';
 import type { Context, Next } from 'hono';
-import { injectable } from 'tsyringe';
+import { container, injectable } from 'tsyringe';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 
@@ -1472,11 +1472,11 @@ describe('HonoHttpApplication internals', () => {
   it('throws descriptive error for invalid provider configuration objects', async () => {
     const app = await createApplication(FactoryModule);
     const internals = app as unknown as {
-      registerRegularProvider: (config: any, scoped: Constructor[]) => void;
+      registerRegularProvider: (config: any) => void;
     };
 
     expect(() =>
-      internals.registerRegularProvider({ provide: Symbol('no-resolver') } as any, []),
+      internals.registerRegularProvider({ provide: Symbol('no-resolver') } as any),
     ).toThrowError(/Invalid provider configuration/);
 
     await app.close('invalid-provider-config');
@@ -1534,6 +1534,883 @@ describe('Lifecycle hooks integration', () => {
     await app.close('SIGTERM');
 
     expect(lifecycleEvents).toEqual(['before:SIGTERM', 'module:destroy', 'app:shutdown:SIGTERM']);
+  });
+
+  it('runs lifecycle hooks once for custom-token singleton providers', async () => {
+    const CLASS_TOKEN = Symbol('CLASS_TOKEN');
+    const VALUE_TOKEN = Symbol('VALUE_TOKEN');
+    const FACTORY_TOKEN = Symbol('FACTORY_TOKEN');
+    const ALIAS_TOKEN = Symbol('ALIAS_TOKEN');
+    const calls: string[] = [];
+
+    @injectable()
+    class ClassLifecycle implements OnModuleInit, OnModuleDestroy {
+      onModuleInit() {
+        calls.push('class:init');
+      }
+      onModuleDestroy() {
+        calls.push('class:destroy');
+      }
+    }
+
+    const valueLifecycle = {
+      onModuleInit: () => calls.push('value:init'),
+      onModuleDestroy: () => calls.push('value:destroy'),
+    };
+
+    @Module({
+      providers: [
+        { provide: CLASS_TOKEN, useClass: ClassLifecycle },
+        { provide: ALIAS_TOKEN, useExisting: CLASS_TOKEN },
+        { provide: VALUE_TOKEN, useValue: valueLifecycle },
+        {
+          provide: FACTORY_TOKEN,
+          useFactory: () => ({
+            onModuleInit: () => calls.push('factory:init'),
+            onModuleDestroy: () => calls.push('factory:destroy'),
+          }),
+        },
+      ],
+    })
+    class ProviderLifecycleModule {}
+
+    const app = await createApplication(ProviderLifecycleModule);
+    expect(calls).toEqual(['class:init', 'value:init', 'factory:init']);
+    expect(app.getContainer().resolve(ALIAS_TOKEN)).toBe(app.getContainer().resolve(CLASS_TOKEN));
+
+    calls.length = 0;
+    await app.close('provider-lifecycle');
+    expect(calls).toEqual(['factory:destroy', 'value:destroy', 'class:destroy']);
+  });
+
+  it('does not adopt lifecycle ownership through regular aliases to custom-container values', async () => {
+    const CUSTOM_CONTAINER_TOKEN = Symbol('CUSTOM_CONTAINER_TOKEN');
+    const ALIAS_TOKEN = Symbol('ALIAS_TOKEN');
+    const calls: string[] = [];
+    const lifecycleProvider = {
+      onModuleInit: () => calls.push('init'),
+      onModuleDestroy: () => calls.push('destroy'),
+    };
+    const applicationContainer = container.createChildContainer();
+    applicationContainer.register(CUSTOM_CONTAINER_TOKEN, { useValue: lifecycleProvider });
+
+    @Module({
+      providers: [{ provide: ALIAS_TOKEN, useExisting: CUSTOM_CONTAINER_TOKEN }],
+    })
+    class CustomContainerAliasModule {}
+
+    const app = await createApplication(CustomContainerAliasModule, {
+      container: applicationContainer,
+    });
+
+    expect(calls).toEqual([]);
+    expect(app.getContainer().resolve(ALIAS_TOKEN)).toBe(lifecycleProvider);
+    expect(app.getContainer().resolve(CUSTOM_CONTAINER_TOKEN)).toBe(lifecycleProvider);
+
+    await app.close('custom-container-alias');
+    expect(calls).toEqual([]);
+  });
+
+  it('runs lifecycle hooks for APP useExisting aliases to singleton middleware definitions', async () => {
+    const MIDDLEWARE_TOKEN = Symbol('MIDDLEWARE_TOKEN');
+    const calls: string[] = [];
+
+    const lifecycleMiddleware: HttpMiddleware &
+      OnModuleInit &
+      OnApplicationBootstrap &
+      OnModuleDestroy &
+      OnApplicationShutdown = {
+      async use(_context, next) {
+        calls.push('middleware:before');
+        await next();
+        calls.push('middleware:after');
+      },
+      onModuleInit() {
+        calls.push('init');
+      },
+      onApplicationBootstrap() {
+        calls.push('bootstrap');
+      },
+      onModuleDestroy() {
+        calls.push('destroy');
+      },
+      onApplicationShutdown(signal) {
+        calls.push(`shutdown:${signal ?? 'none'}`);
+      },
+    };
+
+    @Controller('singleton-middleware')
+    class SingletonMiddlewareController {
+      @Get('/')
+      ping() {
+        return 'pong';
+      }
+    }
+
+    @Module({
+      controllers: [SingletonMiddlewareController],
+      providers: [
+        {
+          provide: MIDDLEWARE_TOKEN,
+          useValue: {
+            handler: lifecycleMiddleware,
+            path: '/singleton-middleware',
+          },
+        },
+        {
+          provide: APP_MIDDLEWARE as unknown as Constructor,
+          useExisting: MIDDLEWARE_TOKEN,
+        },
+      ],
+    })
+    class SingletonMiddlewareAliasModule {}
+
+    const app = await createApplication(SingletonMiddlewareAliasModule);
+    expect(calls).toEqual(['init', 'bootstrap']);
+
+    const response = await app
+      .getInstance()
+      .fetch(new Request('http://localhost/singleton-middleware'));
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe('pong');
+    expect(calls).toEqual(['init', 'bootstrap', 'middleware:before', 'middleware:after']);
+
+    await app.close('singleton-middleware-alias');
+    expect(calls).toEqual([
+      'init',
+      'bootstrap',
+      'middleware:before',
+      'middleware:after',
+      'destroy',
+      'shutdown:singleton-middleware-alias',
+    ]);
+  });
+
+  it('uses an explicit APP useClass declaration over an earlier class-token registration', async () => {
+    const calls: string[] = [];
+
+    @injectable()
+    class DeclaredGuard implements CanActivate, OnModuleInit, OnModuleDestroy {
+      canActivate() {
+        calls.push('declared:activate');
+        return true;
+      }
+      onModuleInit() {
+        calls.push('declared:init');
+      }
+      onModuleDestroy() {
+        calls.push('declared:destroy');
+      }
+    }
+
+    @injectable()
+    class EarlierGuard implements CanActivate, OnModuleInit, OnModuleDestroy {
+      canActivate() {
+        calls.push('earlier:activate');
+        return true;
+      }
+      onModuleInit() {
+        calls.push('earlier:init');
+      }
+      onModuleDestroy() {
+        calls.push('earlier:destroy');
+      }
+    }
+
+    @Controller('owned-app-guard')
+    class OwnedAppGuardController {
+      @Get('/')
+      ping() {
+        return 'pong';
+      }
+    }
+
+    @Module({
+      providers: [{ provide: DeclaredGuard, useClass: EarlierGuard }],
+    })
+    class EarlierGuardModule {}
+
+    @Module({
+      imports: [EarlierGuardModule],
+      controllers: [OwnedAppGuardController],
+      providers: [
+        {
+          provide: APP_GUARD as unknown as Constructor,
+          useClass: DeclaredGuard,
+        },
+      ],
+    })
+    class OwnedAppGuardModule {}
+
+    const app = await createApplication(OwnedAppGuardModule);
+    expect(calls).toEqual(['declared:init']);
+
+    const response = await app.getInstance().fetch(new Request('http://localhost/owned-app-guard'));
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe('pong');
+    expect(calls).toEqual(['declared:init', 'declared:activate']);
+
+    await app.close('owned-app-guard');
+    expect(calls).toEqual(['declared:init', 'declared:activate', 'declared:destroy']);
+  });
+
+  it('runs complete lifecycle once for a decorator-discovered module singleton guard', async () => {
+    const calls: string[] = [];
+
+    @injectable()
+    class SingletonGuard
+      implements
+        CanActivate,
+        OnModuleInit,
+        OnApplicationBootstrap,
+        OnModuleDestroy,
+        OnApplicationShutdown
+    {
+      canActivate() {
+        calls.push('activate');
+        return true;
+      }
+      onModuleInit() {
+        calls.push('init');
+      }
+      onApplicationBootstrap() {
+        calls.push('bootstrap');
+      }
+      onModuleDestroy() {
+        calls.push('destroy');
+      }
+      onApplicationShutdown(signal?: string) {
+        calls.push(`shutdown:${signal ?? 'none'}`);
+      }
+    }
+
+    @Controller('singleton-decorator-guard')
+    class SingletonGuardController {
+      @Get('/')
+      @UseGuards(SingletonGuard)
+      ping() {
+        return 'pong';
+      }
+    }
+
+    @Module({
+      controllers: [SingletonGuardController],
+      providers: [SingletonGuard],
+    })
+    class SingletonGuardModule {}
+
+    const app = await createApplication(SingletonGuardModule);
+    expect(calls).toEqual(['init', 'bootstrap']);
+
+    const response = await app
+      .getInstance()
+      .fetch(new Request('http://localhost/singleton-decorator-guard'));
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe('pong');
+    expect(calls).toEqual(['init', 'bootstrap', 'activate']);
+
+    await app.close('singleton-decorator-guard');
+    expect(calls).toEqual([
+      'init',
+      'bootstrap',
+      'activate',
+      'destroy',
+      'shutdown:singleton-decorator-guard',
+    ]);
+  });
+
+  it('does not enroll a decorator-discovered module transient guard in lifecycle', async () => {
+    const calls: string[] = [];
+
+    @injectable()
+    class TransientDecoratorGuard
+      implements
+        CanActivate,
+        OnModuleInit,
+        OnApplicationBootstrap,
+        OnModuleDestroy,
+        OnApplicationShutdown
+    {
+      canActivate() {
+        calls.push('activate');
+        return true;
+      }
+      onModuleInit() {
+        calls.push('init');
+      }
+      onApplicationBootstrap() {
+        calls.push('bootstrap');
+      }
+      onModuleDestroy() {
+        calls.push('destroy');
+      }
+      onApplicationShutdown() {
+        calls.push('shutdown');
+      }
+    }
+
+    @Controller('transient-decorator-guard')
+    class TransientGuardController {
+      @Get('/')
+      @UseGuards(TransientDecoratorGuard)
+      ping() {
+        return 'pong';
+      }
+    }
+
+    @Module({
+      controllers: [TransientGuardController],
+      providers: [
+        {
+          provide: TransientDecoratorGuard,
+          useClass: TransientDecoratorGuard,
+          singleton: false,
+        },
+      ],
+    })
+    class TransientDecoratorGuardModule {}
+
+    const app = await createApplication(TransientDecoratorGuardModule);
+    expect(calls).toEqual([]);
+
+    const response = await app
+      .getInstance()
+      .fetch(new Request('http://localhost/transient-decorator-guard'));
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe('pong');
+    expect(calls).toEqual(['activate']);
+
+    await app.close('transient-decorator-guard');
+    expect(calls).toEqual(['activate']);
+  });
+
+  it('does not enroll a decorator-discovered external guard in lifecycle', async () => {
+    const calls: string[] = [];
+
+    @injectable()
+    class ExternalDecoratorGuard
+      implements
+        CanActivate,
+        OnModuleInit,
+        OnApplicationBootstrap,
+        OnModuleDestroy,
+        OnApplicationShutdown
+    {
+      canActivate() {
+        calls.push('activate');
+        return true;
+      }
+      onModuleInit() {
+        calls.push('init');
+      }
+      onApplicationBootstrap() {
+        calls.push('bootstrap');
+      }
+      onModuleDestroy() {
+        calls.push('destroy');
+      }
+      onApplicationShutdown() {
+        calls.push('shutdown');
+      }
+    }
+
+    const externalGuard = new ExternalDecoratorGuard();
+    const applicationContainer = container.createChildContainer();
+    applicationContainer.register(ExternalDecoratorGuard, { useValue: externalGuard });
+
+    @Controller('external-decorator-guard')
+    class ExternalDecoratorGuardController {
+      @Get('/')
+      @UseGuards(ExternalDecoratorGuard)
+      ping() {
+        return 'pong';
+      }
+    }
+
+    @Module({ controllers: [ExternalDecoratorGuardController] })
+    class ExternalDecoratorGuardModule {}
+
+    const app = await createApplication(ExternalDecoratorGuardModule, {
+      container: applicationContainer,
+    });
+    expect(calls).toEqual([]);
+
+    const response = await app
+      .getInstance()
+      .fetch(new Request('http://localhost/external-decorator-guard'));
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe('pong');
+    expect(calls).toEqual(['activate']);
+
+    await app.close('external-decorator-guard');
+    expect(calls).toEqual(['activate']);
+  });
+
+  it('does not adopt lifecycle ownership through APP aliases to custom-container providers', async () => {
+    const EXTERNAL_GUARD_TOKEN = Symbol('EXTERNAL_GUARD_TOKEN');
+    const calls: string[] = [];
+
+    @injectable()
+    class ExternalGuard
+      implements CanActivate, OnModuleInit, OnApplicationBootstrap, OnModuleDestroy
+    {
+      canActivate() {
+        calls.push('activate');
+        return true;
+      }
+      onModuleInit() {
+        calls.push('init');
+      }
+      onApplicationBootstrap() {
+        calls.push('bootstrap');
+      }
+      onModuleDestroy() {
+        calls.push('destroy');
+      }
+    }
+
+    const applicationContainer = container.createChildContainer();
+    applicationContainer.register(EXTERNAL_GUARD_TOKEN, { useClass: ExternalGuard });
+
+    @Controller('external-guard')
+    class ExternalGuardController {
+      @Get('/')
+      ping() {
+        return 'pong';
+      }
+    }
+
+    @Module({
+      controllers: [ExternalGuardController],
+      providers: [
+        {
+          provide: APP_GUARD as unknown as Constructor,
+          useExisting: EXTERNAL_GUARD_TOKEN,
+        },
+      ],
+    })
+    class ExternalGuardModule {}
+
+    const app = await createApplication(ExternalGuardModule, {
+      container: applicationContainer,
+    });
+    expect(calls).toEqual([]);
+
+    const response = await app.getInstance().fetch(new Request('http://localhost/external-guard'));
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe('pong');
+    expect(calls).toEqual(['activate']);
+
+    await app.close('external-guard');
+    expect(calls).toEqual(['activate']);
+  });
+
+  it('does not partially run lifecycle hooks for transient APP middleware aliases', async () => {
+    const TRANSIENT_MIDDLEWARE_TOKEN = Symbol('TRANSIENT_MIDDLEWARE_TOKEN');
+    const TRANSIENT_MIDDLEWARE_ALIAS = Symbol('TRANSIENT_MIDDLEWARE_ALIAS');
+    const calls: string[] = [];
+
+    @Middleware({ path: '/transient-middleware' })
+    @injectable()
+    class TransientMiddleware
+      implements HttpMiddleware, OnModuleInit, OnApplicationBootstrap, OnModuleDestroy
+    {
+      async use(_context: Context, next: Next) {
+        calls.push('use');
+        await next();
+      }
+      onModuleInit() {
+        calls.push('init');
+      }
+      onApplicationBootstrap() {
+        calls.push('bootstrap');
+      }
+      onModuleDestroy() {
+        calls.push('destroy');
+      }
+    }
+
+    @Controller('transient-middleware')
+    class TransientMiddlewareController {
+      @Get('/')
+      ping() {
+        return 'pong';
+      }
+    }
+
+    @Module({
+      controllers: [TransientMiddlewareController],
+      providers: [
+        {
+          provide: TRANSIENT_MIDDLEWARE_TOKEN,
+          useClass: TransientMiddleware,
+          singleton: false,
+        },
+        {
+          provide: TRANSIENT_MIDDLEWARE_ALIAS,
+          useExisting: TRANSIENT_MIDDLEWARE_TOKEN,
+        },
+        {
+          provide: APP_MIDDLEWARE as unknown as Constructor,
+          useExisting: TRANSIENT_MIDDLEWARE_ALIAS,
+        },
+      ],
+    })
+    class TransientMiddlewareAliasModule {}
+
+    const app = await createApplication(TransientMiddlewareAliasModule);
+    expect(calls).toEqual([]);
+
+    const response = await app
+      .getInstance()
+      .fetch(new Request('http://localhost/transient-middleware'));
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe('pong');
+    expect(calls).toEqual(['use']);
+
+    await app.close('transient-middleware-alias');
+    expect(calls).toEqual(['use']);
+  });
+
+  it('does not run lifecycle hooks for regular useExisting aliases to transient providers', async () => {
+    const TRANSIENT_TOKEN = Symbol('TRANSIENT_TOKEN');
+    const INTERMEDIATE_ALIAS_TOKEN = Symbol('INTERMEDIATE_ALIAS_TOKEN');
+    const ALIAS_TOKEN = Symbol('ALIAS_TOKEN');
+    const calls: string[] = [];
+
+    @injectable()
+    class TransientLifecycle implements OnModuleInit, OnModuleDestroy {
+      onModuleInit() {
+        calls.push('init');
+      }
+      onModuleDestroy() {
+        calls.push('destroy');
+      }
+      ping() {
+        return 'pong';
+      }
+    }
+
+    @Module({
+      providers: [
+        { provide: TRANSIENT_TOKEN, useClass: TransientLifecycle, singleton: false },
+        { provide: INTERMEDIATE_ALIAS_TOKEN, useExisting: TRANSIENT_TOKEN },
+        { provide: ALIAS_TOKEN, useExisting: INTERMEDIATE_ALIAS_TOKEN },
+      ],
+    })
+    class TransientAliasModule {}
+
+    const app = await createApplication(TransientAliasModule);
+    expect(calls).toEqual([]);
+
+    const aliasA = app.getContainer().resolve<TransientLifecycle>(ALIAS_TOKEN);
+    const aliasB = app.getContainer().resolve<TransientLifecycle>(ALIAS_TOKEN);
+    expect(aliasA.ping()).toBe('pong');
+    expect(aliasA).not.toBe(aliasB);
+    expect(calls).toEqual([]);
+
+    await app.close('transient-alias');
+    expect(calls).toEqual([]);
+  });
+
+  it('ignores stale singleton lifecycle candidates replaced by a final transient', async () => {
+    const SHARED_TOKEN = Symbol('SHARED_TOKEN');
+    const calls: string[] = [];
+    let instances = 0;
+
+    @injectable()
+    class EarlierSingleton implements OnModuleInit, OnModuleDestroy {
+      onModuleInit() {
+        calls.push('earlier:init');
+      }
+      onModuleDestroy() {
+        calls.push('earlier:destroy');
+      }
+    }
+
+    @injectable()
+    class FinalTransient implements OnModuleInit, OnModuleDestroy {
+      constructor() {
+        instances += 1;
+      }
+      onModuleInit() {
+        calls.push('transient:init');
+      }
+      onModuleDestroy() {
+        calls.push('transient:destroy');
+      }
+    }
+
+    @Module({
+      providers: [{ provide: SHARED_TOKEN, useClass: EarlierSingleton }],
+    })
+    class EarlierSingletonModule {}
+
+    @Module({
+      imports: [EarlierSingletonModule],
+      providers: [
+        {
+          provide: SHARED_TOKEN,
+          useClass: FinalTransient,
+          singleton: false,
+        },
+      ],
+    })
+    class FinalTransientModule {}
+
+    const app = await createApplication(FinalTransientModule);
+    expect(calls).toEqual([]);
+    expect(instances).toBe(0);
+
+    const first = app.getContainer().resolve<FinalTransient>(SHARED_TOKEN);
+    const second = app.getContainer().resolve<FinalTransient>(SHARED_TOKEN);
+    expect(first).not.toBe(second);
+    expect(instances).toBe(2);
+
+    await app.close('final-transient');
+    expect(calls).toEqual([]);
+  });
+
+  it('runs lifecycle only for the final singleton registration', async () => {
+    const SHARED_TOKEN = Symbol('SHARED_TOKEN');
+    const calls: string[] = [];
+    const earlierValue = {
+      onModuleInit: () => calls.push('earlier:init'),
+      onModuleDestroy: () => calls.push('earlier:destroy'),
+    };
+
+    @injectable()
+    class FinalSingleton implements OnModuleInit, OnModuleDestroy {
+      onModuleInit() {
+        calls.push('final:init');
+      }
+      onModuleDestroy() {
+        calls.push('final:destroy');
+      }
+    }
+
+    @Module({
+      providers: [{ provide: SHARED_TOKEN, useValue: earlierValue }],
+    })
+    class EarlierValueModule {}
+
+    @Module({
+      imports: [EarlierValueModule],
+      providers: [{ provide: SHARED_TOKEN, useClass: FinalSingleton }],
+    })
+    class FinalSingletonModule {}
+
+    const app = await createApplication(FinalSingletonModule);
+    expect(calls).toEqual(['final:init']);
+    expect(app.getContainer().resolve(SHARED_TOKEN)).toBeInstanceOf(FinalSingleton);
+
+    await app.close('final-singleton');
+    expect(calls).toEqual(['final:init', 'final:destroy']);
+  });
+
+  it('lets a root constructor provider replace an imported class registration', async () => {
+    const calls: string[] = [];
+
+    @injectable()
+    class Service implements OnModuleInit, OnModuleDestroy {
+      identify() {
+        return 'service';
+      }
+      onModuleInit() {
+        calls.push('service:init');
+      }
+      onModuleDestroy() {
+        calls.push('service:destroy');
+      }
+    }
+
+    @injectable()
+    class MockService implements OnModuleInit, OnModuleDestroy {
+      identify() {
+        return 'mock';
+      }
+      onModuleInit() {
+        calls.push('mock:init');
+      }
+      onModuleDestroy() {
+        calls.push('mock:destroy');
+      }
+    }
+
+    @Module({
+      providers: [{ provide: Service, useClass: MockService }],
+    })
+    class ImportedMockModule {}
+
+    @Module({
+      imports: [ImportedMockModule],
+      providers: [Service],
+    })
+    class RootServiceModule {}
+
+    const app = await createApplication(RootServiceModule);
+    const resolved = app.getContainer().resolve(Service);
+
+    expect(resolved).toBeInstanceOf(Service);
+    expect(resolved.identify()).toBe('service');
+    expect(calls).toEqual(['service:init']);
+
+    await app.close('constructor-override');
+    expect(calls).toEqual(['service:init', 'service:destroy']);
+  });
+
+  it('lets a root constructor provider replace an imported transient with one singleton', async () => {
+    const initIds: number[] = [];
+    const destroyIds: number[] = [];
+    let instanceCount = 0;
+
+    @injectable()
+    class Service implements OnModuleInit, OnModuleDestroy {
+      readonly id = ++instanceCount;
+      onModuleInit() {
+        initIds.push(this.id);
+      }
+      onModuleDestroy() {
+        destroyIds.push(this.id);
+      }
+    }
+
+    @Module({
+      providers: [{ provide: Service, useClass: Service, singleton: false }],
+    })
+    class ImportedTransientModule {}
+
+    @Module({
+      imports: [ImportedTransientModule],
+      providers: [Service],
+    })
+    class RootSingletonModule {}
+
+    const app = await createApplication(RootSingletonModule);
+    const first = app.getContainer().resolve(Service);
+    const second = app.getContainer().resolve(Service);
+
+    expect(first).toBe(second);
+    expect(instanceCount).toBe(1);
+    expect(initIds).toEqual([first.id]);
+
+    await app.close('constructor-singleton');
+    expect(destroyIds).toEqual([first.id]);
+  });
+
+  it('lets a root controller declaration replace an imported class registration', async () => {
+    const calls: string[] = [];
+
+    @Controller('owned-controller')
+    class DeclaredController implements OnModuleInit, OnModuleDestroy {
+      @Get('/')
+      handle() {
+        return 'declared';
+      }
+      onModuleInit() {
+        calls.push('declared:init');
+      }
+      onModuleDestroy() {
+        calls.push('declared:destroy');
+      }
+    }
+
+    class EarlierController {
+      handle() {
+        return 'earlier';
+      }
+      onModuleInit() {
+        calls.push('earlier:init');
+      }
+      onModuleDestroy() {
+        calls.push('earlier:destroy');
+      }
+    }
+
+    @Module({
+      providers: [{ provide: DeclaredController, useClass: EarlierController }],
+    })
+    class EarlierControllerModule {}
+
+    @Module({
+      imports: [EarlierControllerModule],
+      controllers: [DeclaredController],
+    })
+    class RootControllerModule {}
+
+    const app = await createApplication(RootControllerModule);
+    expect(app.getContainer().resolve(DeclaredController)).toBeInstanceOf(DeclaredController);
+    expect(calls).toEqual(['declared:init']);
+
+    const response = await app
+      .getInstance()
+      .fetch(new Request('http://localhost/owned-controller'));
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe('declared');
+
+    await app.close('owned-controller');
+    expect(calls).toEqual(['declared:init', 'declared:destroy']);
+  });
+
+  it('does not run lifecycle hooks for APP useExisting aliases to transient enhancers', async () => {
+    const TRANSIENT_GUARD_TOKEN = Symbol('TRANSIENT_GUARD_TOKEN');
+    const TRANSIENT_GUARD_ALIAS = Symbol('TRANSIENT_GUARD_ALIAS');
+    const calls: string[] = [];
+
+    @injectable()
+    class TransientGuard implements CanActivate, OnModuleInit, OnModuleDestroy {
+      canActivate() {
+        calls.push('activate');
+        return true;
+      }
+      onModuleInit() {
+        calls.push('init');
+      }
+      onModuleDestroy() {
+        calls.push('destroy');
+      }
+    }
+
+    @Controller('transient-enhancer')
+    class TransientEnhancerController {
+      @Get('/')
+      ping() {
+        return 'pong';
+      }
+    }
+
+    @Module({
+      controllers: [TransientEnhancerController],
+      providers: [
+        {
+          provide: TRANSIENT_GUARD_TOKEN,
+          useClass: TransientGuard,
+          singleton: false,
+        },
+        {
+          provide: TRANSIENT_GUARD_ALIAS,
+          useExisting: TRANSIENT_GUARD_TOKEN,
+        },
+        {
+          provide: APP_GUARD as unknown as Constructor,
+          useExisting: TRANSIENT_GUARD_ALIAS,
+        },
+      ],
+    })
+    class TransientEnhancerAliasModule {}
+
+    const app = await createApplication(TransientEnhancerAliasModule);
+    expect(calls).toEqual([]);
+
+    const response = await app
+      .getInstance()
+      .fetch(new Request('http://localhost/transient-enhancer'));
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe('pong');
+    expect(calls).toEqual(['activate']);
+
+    await app.close('transient-enhancer-alias');
+    expect(calls).toEqual(['activate']);
   });
 });
 

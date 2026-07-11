@@ -30,6 +30,7 @@ import {
   APP_MIDDLEWARE,
   APP_PIPE,
   BadRequestException,
+  buildRoutePath,
   createLogger,
   ForbiddenException,
   getControllerMetadata,
@@ -73,6 +74,17 @@ type ProviderConfig =
       inject?: InjectionToken[];
       singleton?: boolean;
     };
+
+type LifecycleResolver = () => unknown;
+type ProviderLifecycleClassification =
+  | 'module-singleton'
+  | 'module-transient'
+  | 'external'
+  | 'alias-cycle';
+type ModuleProviderRegistration =
+  | { generation: number; kind: 'singleton' }
+  | { generation: number; kind: 'transient' }
+  | { generation: number; kind: 'alias'; target: InjectionToken };
 
 const GENERATED_RESPONSE = Symbol.for('hono.framework.generatedResponse');
 
@@ -144,7 +156,12 @@ export class HonoHttpApplication {
   private readonly middlewareLogger: PrettyLogger;
   private readonly moduleName: string;
   private readonly instances = new Map<Constructor, unknown>();
-  private readonly moduleInitCalled = new Set<Constructor>();
+  private readonly moduleProviderRegistrations = new Map<
+    InjectionToken,
+    ModuleProviderRegistration
+  >();
+  private providerRegistrationGeneration = 0;
+  private readonly moduleInitCalled = new Set<unknown>();
   private readonly moduleDestroyHooks: OnModuleDestroy[] = [];
   private readonly applicationBootstrapHooks: OnApplicationBootstrap[] = [];
   private readonly beforeApplicationShutdownHooks: BeforeApplicationShutdown[] = [];
@@ -153,7 +170,7 @@ export class HonoHttpApplication {
   private isInitialized = false;
   private isClosing = false;
   private readonly pendingControllers: Constructor[] = [];
-  private readonly pendingLifecycleTokens: Constructor[] = [];
+  private readonly pendingLifecycleResolvers: LifecycleResolver[] = [];
   private readonly pendingGlobalGuardResolvers: Array<() => CanActivate> = [];
   private readonly pendingGlobalPipeResolvers: Array<() => PipeTransform> = [];
   private readonly pendingGlobalInterceptorResolvers: Array<() => Interceptor> = [];
@@ -187,8 +204,8 @@ export class HonoHttpApplication {
     await this.registerModule(this.rootModule);
 
     // First, instantiate providers that participate in lifecycle hooks
-    if (this.pendingLifecycleTokens.length > 0) {
-      await this.invokeModuleInit(this.pendingLifecycleTokens);
+    if (this.pendingLifecycleResolvers.length > 0) {
+      await this.invokeModuleInit();
     }
 
     // Materialize global enhancers provided via APP_* tokens
@@ -270,7 +287,6 @@ export class HonoHttpApplication {
         throw error;
       }
       this.instances.set(token, instance);
-      this.registerLifecycleHandlers(instance);
     }
 
     return this.instances.get(token) as T;
@@ -294,11 +310,18 @@ export class HonoHttpApplication {
   /**
    * Register a provider (Constructor or provider configuration object)
    */
-  private registerProvider(provider: ProviderConfig, scopedTokens: Constructor[]): void {
+  private registerProvider(provider: ProviderConfig): void {
     // Simple case: Constructor as provider
     if (this.isConstructorToken(provider)) {
-      this.registerSingleton(provider as Constructor);
-      scopedTokens.push(provider as Constructor);
+      const token = provider as Constructor;
+      const generation = this.trackProviderLifetime(token, true);
+      this.registerModuleOwnedSingleton(token);
+      this.enqueueModuleProviderLifecycleResolver(
+        token,
+        generation,
+        () => this.getProviderInstance(provider as Constructor),
+        provider as Constructor,
+      );
       return;
     }
 
@@ -316,12 +339,12 @@ export class HonoHttpApplication {
 
     // Handle global enhancers (APP_GUARD, APP_PIPE, etc.)
     if (this.isGlobalEnhancerToken(provideToken)) {
-      this.registerGlobalEnhancer(config, scopedTokens);
+      this.registerGlobalEnhancer(config);
       return;
     }
 
     // Handle regular providers
-    this.registerRegularProvider(config, scopedTokens);
+    this.registerRegularProvider(config);
   }
 
   /**
@@ -340,14 +363,14 @@ export class HonoHttpApplication {
   /**
    * Register a global enhancer (APP_GUARD, APP_PIPE, etc.)
    */
-  private registerGlobalEnhancer(config: any, scopedTokens: Constructor[]): void {
+  private registerGlobalEnhancer(config: any): void {
     const provideToken = config.provide as InjectionToken;
     const enhancerType = this.getEnhancerType(provideToken);
 
     if ('useClass' in config && config.useClass) {
       const useClass = config.useClass as Constructor;
-      this.registerSingleton(useClass);
-      scopedTokens.push(useClass);
+      this.registerModuleOwnedSingleton(useClass);
+      this.enqueueLifecycleResolver(() => this.getProviderInstance(useClass), useClass);
       const resolver = () => {
         const instance = this.getProviderInstance(useClass);
         if (enhancerType === 'middleware') {
@@ -360,6 +383,19 @@ export class HonoHttpApplication {
     }
 
     if ('useExisting' in config && config.useExisting) {
+      this.enqueueLifecycleResolver(
+        () => {
+          if (this.classifyProviderForLifecycle(config.useExisting) !== 'module-singleton') {
+            return undefined;
+          }
+          const value = this.container.resolve(config.useExisting as any);
+          return enhancerType === 'middleware'
+            ? (this.extractMiddlewareLifecycleTarget(value) ?? value)
+            : value;
+        },
+        undefined,
+        true,
+      );
       const resolver = () => {
         const existing = this.container.resolve(config.useExisting as any);
         if (enhancerType === 'middleware') {
@@ -372,38 +408,53 @@ export class HonoHttpApplication {
     }
 
     if ('useValue' in config) {
+      this.enqueueLifecycleResolver(
+        () =>
+          enhancerType === 'middleware'
+            ? (this.extractMiddlewareLifecycleTarget(config.useValue) ?? config.useValue)
+            : config.useValue,
+        undefined,
+        true,
+      );
       if (enhancerType === 'middleware') {
-        const lifecycleTarget = this.extractMiddlewareLifecycleTarget(config.useValue);
-        if (lifecycleTarget) {
-          this.registerLifecycleHandlers(lifecycleTarget);
-        }
         const valueResolver = () => this.resolveMiddlewareDefinition(config.useValue);
         this.addGlobalEnhancerResolver('middleware', valueResolver);
         return;
       }
 
       const valueResolver = () => config.useValue as unknown;
-      this.registerLifecycleHandlers(config.useValue);
       this.addGlobalEnhancerResolver(enhancerType, valueResolver);
       return;
     }
 
     if ('useFactory' in config && config.useFactory) {
-      if (enhancerType === 'middleware') {
-        const factoryResolver = () => {
-          const deps = (config.inject ?? []).map((t) => this.container.resolve(t as any));
-          const result = (config.useFactory as (...args: any[]) => unknown)(...deps);
-          return this.resolveMiddlewareDefinition(result);
-        };
-        this.addGlobalEnhancerResolver('middleware', factoryResolver);
-        return;
-      }
+      let created = false;
+      let rawValue: unknown;
 
-      const factoryResolver = () => {
-        const deps = (config.inject ?? []).map((t) => this.container.resolve(t as any));
-        return (config.useFactory as (...args: any[]) => unknown)(...deps);
+      const resolveRawValue = () => {
+        if (!created) {
+          const deps = (config.inject ?? []).map((token) => this.container.resolve(token as any));
+          rawValue = (config.useFactory as (...args: any[]) => unknown)(...deps);
+          created = true;
+        }
+        return rawValue;
       };
-      this.addGlobalEnhancerResolver(enhancerType, factoryResolver);
+
+      this.enqueueLifecycleResolver(
+        () => {
+          const value = resolveRawValue();
+          return enhancerType === 'middleware'
+            ? (this.extractMiddlewareLifecycleTarget(value) ?? value)
+            : value;
+        },
+        undefined,
+        true,
+      );
+
+      this.addGlobalEnhancerResolver(enhancerType, () => {
+        const value = resolveRawValue();
+        return enhancerType === 'middleware' ? this.resolveMiddlewareDefinition(value) : value;
+      });
       return;
     }
 
@@ -518,7 +569,6 @@ export class HonoHttpApplication {
         metadataSource ?? (value.handler as unknown as Constructor),
       );
       const mergedMetadata = this.mergeMiddlewareMetadata(value, decoratorMetadata);
-      this.registerLifecycleHandlers(value.handler);
       return this.normalizeMiddlewareDefinition({
         handler: value.handler,
         path: mergedMetadata.path,
@@ -530,7 +580,6 @@ export class HonoHttpApplication {
       const decoratorMetadata = this.extractMiddlewareMetadata(
         metadataSource ?? ((value as HttpMiddleware).constructor as Constructor),
       );
-      this.registerLifecycleHandlers(value);
       return this.normalizeMiddlewareDefinition({
         handler: value,
         path: decoratorMetadata.path,
@@ -570,34 +619,59 @@ export class HonoHttpApplication {
   /**
    * Register a regular (non-enhancer) provider
    */
-  private registerRegularProvider(config: any, scopedTokens: Constructor[]): void {
+  private registerRegularProvider(config: any): void {
     const provideToken = config.provide as InjectionToken;
 
     if ('useClass' in config && config.useClass) {
       const useClass = config.useClass as Constructor;
       const isSingleton = config.singleton !== false; // default true
-      this.registerClassProvider(provideToken, useClass, isSingleton, scopedTokens);
+      this.registerClassProvider(provideToken, useClass, isSingleton);
       return;
     }
 
     if ('useExisting' in config && config.useExisting) {
-      this.registerExistingProvider(provideToken, config.useExisting);
+      const generation = this.registerExistingProvider(provideToken, config.useExisting);
+      this.enqueueModuleProviderLifecycleResolver(
+        provideToken,
+        generation,
+        () => {
+          return this.container.resolve(provideToken as any);
+        },
+        undefined,
+        true,
+      );
       return;
     }
 
     if ('useValue' in config) {
-      this.registerValueProvider(provideToken, config.useValue);
+      const generation = this.registerValueProvider(provideToken, config.useValue);
+      this.enqueueModuleProviderLifecycleResolver(
+        provideToken,
+        generation,
+        () => config.useValue,
+        undefined,
+        true,
+      );
       return;
     }
 
     if ('useFactory' in config && config.useFactory) {
       const isSingleton = config.singleton !== false; // default true
-      this.registerFactoryProvider(
+      const generation = this.registerFactoryProvider(
         provideToken,
         config.useFactory,
         config.inject ?? [],
         isSingleton,
       );
+      if (isSingleton) {
+        this.enqueueModuleProviderLifecycleResolver(
+          provideToken,
+          generation,
+          () => this.container.resolve(provideToken as any),
+          undefined,
+          true,
+        );
+      }
       return;
     }
 
@@ -666,8 +740,8 @@ export class HonoHttpApplication {
     token: InjectionToken,
     useClass: Constructor,
     isSingleton: boolean,
-    scopedTokens: Constructor[],
   ): void {
+    const generation = this.trackProviderLifetime(token, isSingleton);
     if (isSingleton) {
       this.container.registerSingleton(token, useClass);
     } else {
@@ -679,33 +753,43 @@ export class HonoHttpApplication {
       colors.yellow(name),
       colors.green(`+${performance.now().toFixed(2)}ms`),
     );
-    scopedTokens.push(useClass);
+    if (isSingleton) {
+      this.enqueueModuleProviderLifecycleResolver(
+        token,
+        generation,
+        () => this.container.resolve(token as any),
+        useClass,
+      );
+    }
   }
 
   /**
    * Register an existing provider (alias)
    */
-  private registerExistingProvider(token: InjectionToken, useExisting: InjectionToken): void {
+  private registerExistingProvider(token: InjectionToken, useExisting: InjectionToken): number {
+    const generation = this.trackProviderAlias(token, useExisting);
     this.container.register(token, { useToken: useExisting } as any);
     this.diLogger.debug(
       'Registered existing provider alias',
       colors.yellow(String(token)),
       colors.green(`+${performance.now().toFixed(2)}ms`),
     );
+    return generation;
   }
 
   /**
    * Register a value provider
    */
-  private registerValueProvider(token: InjectionToken, useValue: unknown): void {
+  private registerValueProvider(token: InjectionToken, useValue: unknown): number {
+    const generation = this.trackProviderLifetime(token, true);
     this.container.register(token, { useValue } as any);
-    this.registerLifecycleHandlers(useValue);
     const name = this.formatTokenName(token as unknown as Constructor);
     this.diLogger.debug(
       'Registered value provider',
       colors.yellow(name),
       colors.green(`+${performance.now().toFixed(2)}ms`),
     );
+    return generation;
   }
 
   /**
@@ -716,7 +800,8 @@ export class HonoHttpApplication {
     useFactory: (...args: any[]) => unknown,
     inject: InjectionToken[],
     isSingleton: boolean,
-  ): void {
+  ): number {
+    const generation = this.trackProviderLifetime(token, isSingleton);
     const factory = (c: DependencyContainer) => {
       const deps = inject.map((t) => c.resolve(t as any));
       return useFactory(...deps);
@@ -730,7 +815,6 @@ export class HonoHttpApplication {
         useFactory: () => {
           if (!created) {
             cached = factory(this.container);
-            this.registerLifecycleHandlers(cached);
             created = true;
           }
           return cached;
@@ -744,6 +828,58 @@ export class HonoHttpApplication {
       'Registered factory provider',
       colors.yellow(String(token)),
       colors.green(`+${performance.now().toFixed(2)}ms`),
+    );
+    return generation;
+  }
+
+  private trackProviderLifetime(token: InjectionToken, isSingleton: boolean): number {
+    const generation = ++this.providerRegistrationGeneration;
+    this.moduleProviderRegistrations.set(token, {
+      generation,
+      kind: isSingleton ? 'singleton' : 'transient',
+    });
+    return generation;
+  }
+
+  private trackProviderAlias(token: InjectionToken, target: InjectionToken): number {
+    const generation = ++this.providerRegistrationGeneration;
+    this.moduleProviderRegistrations.set(token, { generation, kind: 'alias', target });
+    return generation;
+  }
+
+  private classifyProviderForLifecycle(token: InjectionToken): ProviderLifecycleClassification {
+    const visited = new Set<InjectionToken>();
+    let current = token;
+
+    while (true) {
+      if (visited.has(current)) return 'alias-cycle';
+      visited.add(current);
+      const registration = this.moduleProviderRegistrations.get(current);
+      if (!registration) return 'external';
+      if (registration.kind === 'singleton') return 'module-singleton';
+      if (registration.kind === 'transient') return 'module-transient';
+      current = registration.target;
+    }
+  }
+
+  private enqueueModuleProviderLifecycleResolver(
+    token: InjectionToken,
+    generation: number,
+    resolver: LifecycleResolver,
+    metatype?: Constructor,
+    inspectResult = false,
+  ): void {
+    this.enqueueLifecycleResolver(
+      () => {
+        const registration = this.moduleProviderRegistrations.get(token);
+        if (registration?.generation !== generation) return undefined;
+        if (this.classifyProviderForLifecycle(token) !== 'module-singleton') {
+          return undefined;
+        }
+        return resolver();
+      },
+      metatype,
+      inspectResult,
     );
   }
 
@@ -769,6 +905,27 @@ export class HonoHttpApplication {
     if (!collection.includes(instance)) {
       collection.push(instance);
     }
+  }
+
+  private hasLifecycleConstructor(ctor: Constructor | undefined): boolean {
+    if (!ctor?.prototype) return false;
+    const prototype = ctor.prototype;
+    return (
+      typeof prototype.onModuleInit === 'function' ||
+      typeof prototype.onModuleDestroy === 'function' ||
+      typeof prototype.onApplicationBootstrap === 'function' ||
+      typeof prototype.beforeApplicationShutdown === 'function' ||
+      typeof prototype.onApplicationShutdown === 'function'
+    );
+  }
+
+  private enqueueLifecycleResolver(
+    resolver: LifecycleResolver,
+    metatype?: Constructor,
+    inspectResult = false,
+  ): void {
+    if (!inspectResult && !this.hasLifecycleConstructor(metatype)) return;
+    this.pendingLifecycleResolvers.push(resolver);
   }
 
   private resolveInstance<T>(token: Constructor<T>): T {
@@ -818,16 +975,21 @@ export class HonoHttpApplication {
       .join('\n');
   }
 
+  private registerModuleOwnedSingleton<T>(token: Constructor<T>): void {
+    const injectionToken = token as unknown as InjectionToken<T>;
+    this.container.registerSingleton(injectionToken, token);
+    const providerName = token.name && token.name.length > 0 ? token.name : token.toString();
+    this.diLogger.debug(
+      'Registered singleton provider',
+      colors.yellow(providerName),
+      colors.green(`+${performance.now().toFixed(2)}ms`),
+    );
+  }
+
   private registerSingleton<T>(token: Constructor<T>): void {
     const injectionToken = token as unknown as InjectionToken<T>;
     if (!this.container.isRegistered(injectionToken, true)) {
-      this.container.registerSingleton(injectionToken, token);
-      const providerName = token.name && token.name.length > 0 ? token.name : token.toString();
-      this.diLogger.debug(
-        'Registered singleton provider',
-        colors.yellow(providerName),
-        colors.green(`+${performance.now().toFixed(2)}ms`),
-      );
+      this.registerModuleOwnedSingleton(token);
     }
   }
 
@@ -856,25 +1018,24 @@ export class HonoHttpApplication {
     this.logger.debug('Registering module', moduleClass.name);
 
     const metadata = getModuleMetadata(moduleClass);
-    const scopedTokens: Constructor[] = [];
 
     for (const importedModule of resolveModuleImports(metadata.imports)) {
       await this.registerModule(importedModule);
     }
 
     for (const provider of metadata.providers ?? []) {
-      this.registerProvider(provider as any, scopedTokens);
+      this.registerProvider(provider as any);
     }
 
     for (const controller of metadata.controllers ?? []) {
-      this.registerSingleton(controller as Constructor);
-      scopedTokens.push(controller as Constructor);
+      this.registerModuleOwnedSingleton(controller as Constructor);
+      this.enqueueLifecycleResolver(
+        () => this.getProviderInstance(controller as Constructor),
+        controller as Constructor,
+      );
       // Defer controller instantiation until all modules are registered
       this.pendingControllers.push(controller as Constructor);
     }
-
-    // Defer lifecycle instantiation until all modules are registered
-    this.pendingLifecycleTokens.push(...scopedTokens);
 
     this.logger.debug(
       'Module registration complete',
@@ -883,34 +1044,17 @@ export class HonoHttpApplication {
     );
   }
 
-  private async invokeModuleInit(tokens: Constructor[]): Promise<void> {
-    const hasLifecycle = (ctor: Constructor | undefined): boolean => {
-      if (!ctor) return false;
-      const proto = (ctor as any).prototype;
-      if (!proto) return false;
-      return (
-        typeof proto.onModuleInit === 'function' ||
-        typeof proto.onModuleDestroy === 'function' ||
-        typeof proto.onApplicationBootstrap === 'function' ||
-        typeof proto.beforeApplicationShutdown === 'function' ||
-        typeof proto.onApplicationShutdown === 'function'
-      );
-    };
+  private async invokeModuleInit(): Promise<void> {
+    for (const resolve of this.pendingLifecycleResolvers) {
+      const instance = resolve();
+      this.registerLifecycleHandlers(instance);
 
-    for (const token of tokens) {
-      if (!token) continue;
-      if (this.moduleInitCalled.has(token)) continue;
-
-      // Only instantiate providers that participate in lifecycle hooks.
-      // Controllers are instantiated when routes are registered.
-      if (!hasLifecycle(token)) continue;
-
-      const instance = this.getProviderInstance(token);
-      this.moduleInitCalled.add(token);
-
-      if (isOnModuleInitHook(instance)) {
-        await instance.onModuleInit();
+      if (!isOnModuleInitHook(instance) || this.moduleInitCalled.has(instance)) {
+        continue;
       }
+
+      this.moduleInitCalled.add(instance);
+      await instance.onModuleInit();
     }
   }
 
@@ -1002,30 +1146,12 @@ export class HonoHttpApplication {
     controller: ReturnType<typeof getControllerMetadata>,
     routePath: string,
   ): string {
-    const globalPrefix = this.options.globalPrefix ?? '';
-    const pieces = [routePath];
-    if (controller.prefix) {
-      pieces.unshift(controller.prefix);
-    }
-    if (!controller.bypassGlobalPrefix && globalPrefix) {
-      pieces.unshift(globalPrefix);
-    }
-
-    if (pieces.length === 0) {
-      return '/';
-    }
-
-    const normalized = pieces
-      .map((segment) => segment?.trim())
-      .filter(Boolean)
-      .map((segment) => (segment!.startsWith('/') ? segment : `/${segment}`));
-
-    const joined = normalized.join('').replaceAll(/[/\\]+/g, '/');
-    if (joined.length > 1 && joined.endsWith('/')) {
-      return joined.slice(0, -1);
-    }
-
-    return joined || '/';
+    return buildRoutePath({
+      bypassGlobalPrefix: controller.bypassGlobalPrefix,
+      controllerPrefix: controller.prefix,
+      globalPrefix: this.options.globalPrefix,
+      routePath,
+    });
   }
 
   private async executeGuards(

@@ -86,7 +86,7 @@ function buildZodSchemaDto<TSchema extends ZodType>(
 ): Constructor<z.output<TSchema>> {
   @ZodSchema(schema)
   class ZodSchemaDto {
-    constructor(initial?: z.output<TSchema>) {
+    constructor(initial?: unknown) {
       if (initial && typeof initial === 'object') {
         Object.assign(this, initial);
       }

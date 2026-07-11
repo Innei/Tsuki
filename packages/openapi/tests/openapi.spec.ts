@@ -22,6 +22,26 @@ function getOperation(doc: ReturnType<typeof createOpenApiDocument>, path: strin
   return operation as OpenApiOperation;
 }
 
+it('matches runtime paths when a controller bypasses the global prefix', () => {
+  @Controller({ prefix: 'static', bypassGlobalPrefix: true })
+  class StaticController {
+    @Get('/asset')
+    asset() {}
+  }
+
+  @Module({ controllers: [StaticController] })
+  class StaticModule {}
+
+  const doc = createOpenApiDocument(StaticModule, {
+    title: 'test',
+    version: '0.0.0',
+    globalPrefix: '/api',
+  });
+
+  expect(doc.paths['/static/asset']).toBeDefined();
+  expect(doc.paths['/api/static/asset']).toBeUndefined();
+});
+
 describe('createOpenApiDocument · Zod 4 schema lowering', () => {
   describe('wrapper unwrapping (lowercase def.type)', () => {
     it('treats optional()/default()/catch() as non-required and preserves nullable', () => {
@@ -196,5 +216,94 @@ describe('createOpenApiDocument · Zod 4 schema lowering', () => {
       expect(schema.properties.numberLit).toEqual({ type: 'number', enum: [42] });
       expect(schema.properties.booleanLit).toEqual({ type: 'boolean', enum: [true] });
     });
+  });
+
+  it('preserves string and number constraints', () => {
+    class ConstraintDto extends createZodSchemaDto(
+      z.object({
+        email: z.string().min(3).max(64).email(),
+        code: z.string().length(8),
+        count: z.number().min(1).max(10).int(),
+        ratio: z.number().gt(0).lt(1),
+      }),
+      { name: 'ConstraintDto' },
+    ) {}
+
+    @Controller('constraints')
+    class ConstraintController {
+      @Post('/')
+      create(@Body() _body: ConstraintDto) {
+        void _body;
+      }
+    }
+
+    const doc = buildDocFromController(ConstraintController);
+    const properties = (doc.components?.schemas?.ConstraintDto as any).properties;
+
+    expect(properties.email).toEqual({
+      type: 'string',
+      minLength: 3,
+      maxLength: 64,
+      format: 'email',
+    });
+    expect(properties.code).toEqual({ type: 'string', minLength: 8, maxLength: 8 });
+    expect(properties.count).toMatchObject({ type: 'integer', minimum: 1, maximum: 10 });
+    expect(properties.ratio).toMatchObject({
+      type: 'number',
+      exclusiveMinimum: 0,
+      exclusiveMaximum: 1,
+    });
+  });
+
+  it('preserves top-level Zod 4 format constructors', () => {
+    class TopLevelFormatDto extends createZodSchemaDto(
+      z.object({
+        email: z.email(),
+        url: z.url(),
+        uuid: z.uuid(),
+        count: z.int(),
+      }),
+      { name: 'TopLevelFormatDto' },
+    ) {}
+
+    @Controller('top-level-formats')
+    class TopLevelFormatController {
+      @Post('/')
+      create(@Body() _body: TopLevelFormatDto) {
+        void _body;
+      }
+    }
+
+    const doc = buildDocFromController(TopLevelFormatController);
+    const properties = (doc.components?.schemas?.TopLevelFormatDto as any).properties;
+
+    expect(properties.email).toEqual({ type: 'string', format: 'email' });
+    expect(properties.url).toEqual({ type: 'string', format: 'uri' });
+    expect(properties.uuid).toEqual({ type: 'string', format: 'uuid' });
+    expect(properties.count).toEqual({ type: 'integer' });
+  });
+
+  it('normalizes top-level and chained Zod date-time formats', () => {
+    class DateTimeFormatDto extends createZodSchemaDto(
+      z.object({
+        topLevel: z.iso.datetime(),
+        chained: z.string().datetime(),
+      }),
+      { name: 'DateTimeFormatDto' },
+    ) {}
+
+    @Controller('date-time-formats')
+    class DateTimeFormatController {
+      @Post('/')
+      create(@Body() _body: DateTimeFormatDto) {
+        void _body;
+      }
+    }
+
+    const doc = buildDocFromController(DateTimeFormatController);
+    const properties = (doc.components?.schemas?.DateTimeFormatDto as any).properties;
+
+    expect(properties.topLevel).toEqual({ type: 'string', format: 'date-time' });
+    expect(properties.chained).toEqual({ type: 'string', format: 'date-time' });
   });
 });

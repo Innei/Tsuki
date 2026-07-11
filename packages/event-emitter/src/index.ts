@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import type { Constructor, OnModuleDestroy, OnModuleInit } from '@tsuki-hono/common';
 import { createLogger, Module } from '@tsuki-hono/common';
 import { ContainerRef } from '@tsuki-hono/core';
@@ -34,6 +36,7 @@ export interface EventMessage<T = unknown> {
   emittedAt: string;
   event: string;
   payload: T;
+  sourceId?: string;
 }
 
 export type EventHandler<T = unknown> = (payload: T) => Promise<void> | void;
@@ -127,6 +130,7 @@ export function EmitEvent(
 
 @injectable()
 export class EventEmitterService implements OnModuleDestroy {
+  private readonly sourceId = randomUUID();
   private publisher?: RedisClient;
   private subscriber?: RedisClient;
   private channel = 'tsuki:events';
@@ -148,7 +152,7 @@ export class EventEmitterService implements OnModuleDestroy {
     const onMessage = async (_channel: string, message: string) => {
       try {
         const envelope = JSON.parse(message) as EventMessage;
-        if (!envelope?.event) return;
+        if (!envelope?.event || envelope.sourceId === this.sourceId) return;
         await this.dispatch(envelope.event, envelope.payload);
       } catch (error) {
         this.logger.error(`Failed to process event message: ${formatError(error)}`);
@@ -191,6 +195,7 @@ export class EventEmitterService implements OnModuleDestroy {
       event,
       payload,
       emittedAt: new Date().toISOString(),
+      sourceId: this.sourceId,
     };
 
     if (!this.started) {

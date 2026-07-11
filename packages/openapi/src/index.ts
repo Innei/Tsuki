@@ -1,6 +1,7 @@
 /* c8 ignore file */
 import type { Constructor, RouteParamMetadataItem } from '@tsuki-hono/common';
 import {
+  buildRoutePath,
   getApiDoc,
   getApiTags,
   getControllerMetadata,
@@ -184,7 +185,12 @@ export function createOpenApiDocument(
     const classDoc = getApiDoc(controller);
 
     for (const route of routes) {
-      const fullPath = normalizePath(options.globalPrefix, controllerMetadata.prefix, route.path);
+      const fullPath = buildRoutePath({
+        bypassGlobalPrefix: controllerMetadata.bypassGlobalPrefix,
+        controllerPrefix: controllerMetadata.prefix,
+        globalPrefix: options.globalPrefix,
+        routePath: route.path,
+      });
       const openApiPath = convertHonoPathToOpenApi(fullPath);
       const method = route.method.toLowerCase();
 
@@ -450,20 +456,6 @@ function sanitizeOperationId(value: string): string {
   return value.replaceAll(/\W/g, '_');
 }
 
-function normalizePath(...segments: Array<string | undefined | null>): string {
-  const filtered = segments
-    .filter((segment): segment is string => Boolean(segment && segment.trim().length > 0))
-    .map((segment) => segment.trim())
-    .map((segment) => segment.replaceAll(/^\/+|\/+$|\s+/g, ''))
-    .filter((segment) => segment.length > 0);
-
-  if (filtered.length === 0) {
-    return '/';
-  }
-
-  return `/${filtered.join('/')}`.replaceAll(/\/+/g, '/');
-}
-
 function convertHonoPathToOpenApi(path: string): string {
   return path.replaceAll(/:(\w+)/g, '{$1}');
 }
@@ -663,6 +655,27 @@ function getDefinition(schema: ZodType): Record<string, any> {
   return {};
 }
 
+function getCheckDefinition(check: unknown): Record<string, any> {
+  if (!check || typeof check !== 'object') {
+    return {};
+  }
+
+  const publicDef = Reflect.get(check, 'def');
+  if (publicDef && typeof publicDef === 'object') {
+    return publicDef as Record<string, any>;
+  }
+
+  const internal = Reflect.get(check, '_zod');
+  if (internal && typeof internal === 'object') {
+    const internalDef = Reflect.get(internal, 'def');
+    if (internalDef && typeof internalDef === 'object') {
+      return internalDef as Record<string, any>;
+    }
+  }
+
+  return check as Record<string, any>;
+}
+
 function getTypeName(schema: ZodType): string | undefined {
   const def = getDefinition(schema);
   return def.typeName ?? def.type ?? schema.constructor?.name;
@@ -756,7 +769,7 @@ function unwrapSchema(schema: ZodType): {
 function mapZodType(schema: ZodType): SchemaConversionResult {
   const typeName = getTypeName(schema);
 
-  if (schema instanceof ZodString) {
+  if (schema instanceof ZodString || typeName === 'string') {
     return {
       schema: buildStringSchema(schema),
       optional: false,
@@ -874,37 +887,48 @@ function mapZodType(schema: ZodType): SchemaConversionResult {
   };
 }
 
-function buildStringSchema(schema: ZodString): Record<string, unknown> {
+function buildStringSchema(schema: ZodType): Record<string, unknown> {
   const jsonSchema: Record<string, unknown> = { type: 'string' };
 
   const def = getDefinition(schema);
-  const checks: Array<{ kind: string; value?: unknown }> = def.checks ?? [];
+  const checks: Array<Record<string, any>> = [...(def.checks ?? []), ...(def.check ? [def] : [])];
 
-  for (const check of checks) {
-    switch (check.kind) {
-      case 'min': {
-        jsonSchema.minLength = check.value;
+  for (const rawCheck of checks) {
+    const check = getCheckDefinition(rawCheck);
+    const kind = rawCheck.kind ?? check.check;
+
+    switch (kind) {
+      case 'min':
+      case 'min_length': {
+        jsonSchema.minLength = rawCheck.value ?? check.minimum;
         break;
       }
-      case 'max': {
-        jsonSchema.maxLength = check.value;
+      case 'max':
+      case 'max_length': {
+        jsonSchema.maxLength = rawCheck.value ?? check.maximum;
         break;
       }
-      case 'length': {
-        jsonSchema.minLength = check.value;
-        jsonSchema.maxLength = check.value;
+      case 'length':
+      case 'length_equals': {
+        const length = rawCheck.value ?? check.length;
+        jsonSchema.minLength = length;
+        jsonSchema.maxLength = length;
         break;
       }
-      case 'email': {
-        jsonSchema.format = 'email';
-        break;
-      }
-      case 'uuid': {
-        jsonSchema.format = 'uuid';
-        break;
-      }
+      case 'email':
+      case 'uuid':
       case 'url': {
-        jsonSchema.format = 'uri';
+        jsonSchema.format = kind === 'url' ? 'uri' : kind;
+        break;
+      }
+      case 'string_format': {
+        if (check.format === 'url') {
+          jsonSchema.format = 'uri';
+        } else if (check.format === 'datetime') {
+          jsonSchema.format = 'date-time';
+        } else if (typeof check.format === 'string') {
+          jsonSchema.format = check.format;
+        }
         break;
       }
       default: {
@@ -920,11 +944,30 @@ function buildNumberSchema(schema: ZodNumber): Record<string, unknown> {
   const jsonSchema: Record<string, unknown> = { type: 'number' };
 
   const def = getDefinition(schema);
-  const checks: Array<{ kind: string; value?: number; inclusive?: boolean }> = def.checks ?? [];
+  const checks: Array<Record<string, any>> = [...(def.checks ?? []), ...(def.check ? [def] : [])];
 
-  for (const check of checks) {
-    switch (check.kind) {
+  for (const rawCheck of checks) {
+    const check = getCheckDefinition(rawCheck);
+    const kind = rawCheck.kind ?? check.check;
+
+    switch (kind) {
       case 'min': {
+        if (rawCheck.inclusive === false) {
+          jsonSchema.exclusiveMinimum = rawCheck.value;
+        } else {
+          jsonSchema.minimum = rawCheck.value;
+        }
+        break;
+      }
+      case 'max': {
+        if (rawCheck.inclusive === false) {
+          jsonSchema.exclusiveMaximum = rawCheck.value;
+        } else {
+          jsonSchema.maximum = rawCheck.value;
+        }
+        break;
+      }
+      case 'greater_than': {
         if (check.inclusive === false) {
           jsonSchema.exclusiveMinimum = check.value;
         } else {
@@ -932,7 +975,7 @@ function buildNumberSchema(schema: ZodNumber): Record<string, unknown> {
         }
         break;
       }
-      case 'max': {
+      case 'less_than': {
         if (check.inclusive === false) {
           jsonSchema.exclusiveMaximum = check.value;
         } else {
@@ -942,6 +985,12 @@ function buildNumberSchema(schema: ZodNumber): Record<string, unknown> {
       }
       case 'int': {
         jsonSchema.type = 'integer';
+        break;
+      }
+      case 'number_format': {
+        if (typeof check.format === 'string' && check.format.includes('int')) {
+          jsonSchema.type = 'integer';
+        }
         break;
       }
       default: {
