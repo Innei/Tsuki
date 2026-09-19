@@ -1,6 +1,6 @@
 # Tsuki — guide for LLMs and coding agents
 
-Use this file when you edit the Tsuki monorepo or scaffold/extend an application that depends on `@tsuki-hono/*`. It is tool-agnostic (Cursor, Claude Code, Codex, etc.). Human-oriented docs: package READMEs under `packages/*/README.md`. This repo also has `CLAUDE.md` with overlapping maintainer notes.
+Use this file when you edit the Tsuki monorepo or scaffold/extend an application that depends on `@tsuki-hono/*`. It is tool-agnostic (Cursor, Claude Code, Codex, etc.). Human-oriented docs: package READMEs under `packages/*/README.md`. This repo also has `AGENTS.md` with overlapping maintainer notes.
 
 ## What Tsuki is
 
