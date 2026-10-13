@@ -15,6 +15,8 @@ The audit traced HTTP parsing, guards, DTO validation/transformation, DI access,
 | Starter cache API                    | HTTP callers can read unrelated Redis keys or overwrite event counters.                                                 | Limit accesses to the `cache:` namespace.                                               |
 | Development Compose                  | Redis without authentication and Postgres with demo credentials listen on every host interface.                         | Bind published database ports to `127.0.0.1`.                                           |
 
+Package archives also omit `.gitignore`. The CLI now ships the starter's rules as `_gitignore` and restores the filename when scaffolding. Generated projects ignore `.env` and `.env.*`, while `.env.example` remains trackable.
+
 ## Dependency changes
 
 Hono is updated to 4.13.13, with a supported peer minimum of 4.13.7; the Node adapter resolves to 1.19.17. The Hono upgrade includes the [upstream JSX escaping fix](https://github.com/honojs/hono/security/advisories/GHSA-hxh3-vqpv-xpqv). Development dependencies are refreshed within compatible ranges. Two scoped overrides replace vulnerable tar and esbuild versions held by old development-tool dependencies.

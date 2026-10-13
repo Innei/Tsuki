@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { cpSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -65,6 +65,9 @@ function copyTemplate({ source, target, projectName }: CopyOptions): void {
       return !SKIP_FILES.has(base) && (base === '.env.example' || !base.startsWith('.env.'));
     },
   });
+
+  const gitignore = path.resolve(target, '_gitignore');
+  if (existsSync(gitignore)) renameSync(gitignore, path.resolve(target, '.gitignore'));
 
   const pkgJsonPath = path.resolve(target, 'package.json');
   const pkgJson = JSON.parse(readFileSync(pkgJsonPath, 'utf8'));

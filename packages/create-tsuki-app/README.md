@@ -29,5 +29,6 @@ The template is sourced from [`examples/starter`](../../examples/starter) in the
 
 - The published tarball ships a `template/` directory that mirrors `examples/starter` at the time of publish.
 - `.env` and `.env.*` files are excluded from the template, except for `.env.example`.
+- The starter's `.gitignore` is shipped as `_gitignore` and restored when scaffolding, so generated apps keep local env files out of Git.
 - `pnpm sync-template` copies `examples/starter` into `template/` and rewrites `workspace:*` deps to real version ranges.
 - `pnpm prepublishOnly` runs `sync-template` then `build`, so the freshest template is always bundled.

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { cpSync, existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -27,6 +27,9 @@ cpSync(sourceDir, targetDir, {
     return !SKIP.has(base) && (base === '.env.example' || !base.startsWith('.env.'));
   },
 });
+
+// npm excludes .gitignore from tarballs, so restore its name when scaffolding.
+renameSync(path.join(targetDir, '.gitignore'), path.join(targetDir, '_gitignore'));
 
 const pkgJsonPath = path.resolve(targetDir, 'package.json');
 const pkgJson = JSON.parse(readFileSync(pkgJsonPath, 'utf8'));

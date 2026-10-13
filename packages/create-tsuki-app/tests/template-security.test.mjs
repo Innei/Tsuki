@@ -41,6 +41,10 @@ test('publishing and scaffolding exclude local secrets while retaining the env e
     writeFileSync(path.join(fixturePackage, 'package.json'), '{"type":"module"}');
     writeFileSync(path.join(starter, 'package.json'), '{"name":"starter"}');
     writeFileSync(path.join(starter, '.env.example'), 'DATABASE_URL=postgres://example');
+    writeFileSync(
+      path.join(starter, '.gitignore'),
+      `${readFileSync(path.resolve(packageDir, '..', '..', 'examples', 'starter', '.gitignore'), 'utf8')}\nfixture-private.txt\n`,
+    );
     const secrets = ['.env', '.env.local', '.env.production', 'nested/.env.production.local'];
     for (const secret of secrets) writeFileSync(path.join(starter, secret), 'PRIVATE_TOKEN=secret');
 
@@ -53,6 +57,7 @@ test('publishing and scaffolding exclude local secrets while retaining the env e
     );
     assert.equal(sync.status, 0, sync.stderr);
     const template = path.join(fixturePackage, 'template');
+    assert.equal(existsSync(path.join(template, '.gitignore')), false);
     for (const secret of secrets) assert.equal(existsSync(path.join(template, secret)), false);
     assert.equal(
       readFileSync(path.join(template, '.env.example'), 'utf8'),
@@ -78,6 +83,18 @@ test('publishing and scaffolding exclude local secrets while retaining the env e
       JSON.parse(readFileSync(path.join(target, 'package.json'), 'utf8')).name,
       'my-app',
     );
+    assert.equal(existsSync(path.join(target, '_gitignore')), false);
+    const gitInit = spawnSync('git', ['init', '--quiet'], { cwd: target, encoding: 'utf8' });
+    assert.equal(gitInit.status, 0, gitInit.stderr);
+    for (const secret of ['.env', '.env.local', '.env.production', 'fixture-private.txt']) {
+      writeFileSync(path.join(target, secret), 'PRIVATE_TOKEN=secret');
+      const ignored = spawnSync('git', ['check-ignore', '--quiet', secret], { cwd: target });
+      assert.equal(ignored.status, 0, `${secret} must be ignored in generated applications`);
+    }
+    const exampleIgnored = spawnSync('git', ['check-ignore', '--quiet', '.env.example'], {
+      cwd: target,
+    });
+    assert.equal(exampleIgnored.status, 1, '.env.example must remain trackable');
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
