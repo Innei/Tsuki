@@ -19,7 +19,8 @@
   "scripts": {
     "build": "tsdown",
     "prepublishOnly": "pnpm sync-template && pnpm build",
-    "sync-template": "node scripts/sync-template.mjs"
+    "sync-template": "node scripts/sync-template.mjs",
+    "test": "node --test tests/*.test.mjs"
   },
   "dependencies": {
     "picocolors": "1.1.1"

@@ -1,13 +1,12 @@
 #!/bin/bash
 set -euo pipefail
 
-mask_url() {
-  local raw="${1:-}"
-  if [ -z "$raw" ]; then
+connection_status() {
+  if [ -z "${1:-}" ]; then
     echo "<unset>"
-    return
+  else
+    echo "<configured>"
   fi
-  echo "$raw" | sed -E 's#(://[^:@/]+):[^@]+@#\1:************@#'
 }
 
 parse_booleanish() {
@@ -22,8 +21,8 @@ echo "============== Tsuki starter =============="
 echo "- Node:         $(node -v 2> /dev/null || echo '<missing>')"
 echo "- PWD:          $(pwd)"
 echo "- Listen:       ${HOSTNAME:-0.0.0.0}:${PORT:-3000}"
-echo "- DATABASE_URL: $(mask_url "${DATABASE_URL:-}")"
-echo "- REDIS_URL:    $(mask_url "${REDIS_URL:-}")"
+echo "- DATABASE_URL: $(connection_status "${DATABASE_URL:-}")"
+echo "- REDIS_URL:    $(connection_status "${REDIS_URL:-}")"
 echo "- MIGRATIONS:   ${MIGRATIONS_DIR:-/app/drizzle}"
 echo "- AUTO_MIGRATE: ${AUTO_MIGRATE:-true}"
 echo "==========================================="

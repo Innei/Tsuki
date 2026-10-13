@@ -18,7 +18,7 @@ export class CacheController {
   @Get('/:key')
   @ApiDoc({ summary: 'Read a cache entry' })
   async read(@Param('key') key: string) {
-    const value = await this.redis.get().get(key);
+    const value = await this.redis.get().get(`cache:${key}`);
     if (value === null) {
       throw createAppException(AppErrorCode.CACHE_KEY_NOT_FOUND, { key });
     }
@@ -32,9 +32,9 @@ export class CacheController {
     const client = this.redis.get();
 
     if (body.ttlSeconds) {
-      await client.set(key, body.value, 'EX', body.ttlSeconds);
+      await client.set(`cache:${key}`, body.value, 'EX', body.ttlSeconds);
     } else {
-      await client.set(key, body.value);
+      await client.set(`cache:${key}`, body.value);
     }
 
     return { key, value: body.value, ttlSeconds: body.ttlSeconds ?? null };

@@ -61,8 +61,8 @@ function copyTemplate({ source, target, projectName }: CopyOptions): void {
   cpSync(source, target, {
     recursive: true,
     filter: (src) => {
-      const base = src.split('/').pop();
-      return !base || !SKIP_FILES.has(base);
+      const base = path.basename(src);
+      return !SKIP_FILES.has(base) && (base === '.env.example' || !base.startsWith('.env.'));
     },
   });
 

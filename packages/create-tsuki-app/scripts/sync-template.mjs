@@ -23,8 +23,8 @@ const SKIP = new Set(['node_modules', 'dist', '.env', '.tsbuildinfo', '.turbo'])
 cpSync(sourceDir, targetDir, {
   recursive: true,
   filter: (src) => {
-    const base = src.split('/').pop();
-    return !base || !SKIP.has(base);
+    const base = path.basename(src);
+    return !SKIP.has(base) && (base === '.env.example' || !base.startsWith('.env.'));
   },
 });
 

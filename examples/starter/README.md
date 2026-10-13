@@ -40,6 +40,7 @@ pnpm dev
 ```
 
 The server listens on `http://localhost:3000`. The `/api` prefix is applied to all controllers.
+Local Postgres and Redis ports are bound to `127.0.0.1`.
 
 - OpenAPI JSON: `http://localhost:3000/internal/openapi.json`
 - Scalar docs UI: `http://localhost:3000/internal/docs`
@@ -82,6 +83,8 @@ curl http://localhost:3000/api/posts/1
 Creating a post triggers a `post.created` event; the listener increments `stats:posts_created` in Redis.
 
 ### Cache (Redis)
+
+Cache entries use the Redis `cache:` prefix to keep these endpoints separate from application data such as event counters. Existing unprefixed entries need to be copied into this namespace to remain accessible.
 
 ```bash
 curl -X PUT http://localhost:3000/api/cache/greeting \
