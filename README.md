@@ -106,7 +106,10 @@ Automated tools work best when they share the same constraints as the framework.
 ```bash
 pnpm install # Install all dependencies
 pnpm test    # Run all tests across packages
+pnpm bench   # Compare Tsuki and plain Hono over local HTTP
 ```
+
+See [benchmark methodology and results](./benchmarks/README.md) and the [security audit](./docs/security-audit.md).
 
 ## License
 

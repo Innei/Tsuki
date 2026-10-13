@@ -1,0 +1,18 @@
+{
+  "name": "@tsuki-hono/benchmarks",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "bench": "pnpm build && node run.mjs",
+    "build": "tsdown"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.19.15",
+    "@tsuki-hono/common": "workspace:*",
+    "@tsuki-hono/core": "workspace:*",
+    "hono": "4.13.13"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.3"
+  }
+}

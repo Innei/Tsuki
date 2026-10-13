@@ -52,6 +52,25 @@ importers:
         specifier: ^6.0.3
         version: 6.0.3
 
+  benchmarks:
+    dependencies:
+      '@hono/node-server':
+        specifier: ^1.19.15
+        version: 1.19.17(hono@4.13.13)
+      '@tsuki-hono/common':
+        specifier: workspace:*
+        version: link:../packages/common
+      '@tsuki-hono/core':
+        specifier: workspace:*
+        version: link:../packages/core
+      hono:
+        specifier: 4.13.13
+        version: 4.13.13
+    devDependencies:
+      '@types/node':
+        specifier: ^25.9.3
+        version: 25.9.3
+
   examples/starter:
     dependencies:
       '@hono/node-server':

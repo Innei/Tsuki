@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "bench": "pnpm --filter @tsuki-hono/benchmarks bench",
     "build": "pnpm -r run build",
     "changelog": "changelogithub",
     "format": "prettier --write .",
