@@ -400,6 +400,50 @@ it('returns untransformed values when metatype is missing', () => {
   expect(result).toBe('raw');
 });
 
+it('keeps untrusted DTO fields from changing the instance prototype', () => {
+  const payload = JSON.parse('{"name":"demo","__proto__":{"isAdmin":true}}');
+  const GeneratedDto = createZodDto(z.object({ name: z.string() }));
+  const generated = new GeneratedDto(payload);
+
+  expect(Object.getPrototypeOf(generated)).toBe(GeneratedDto.prototype);
+  expect((generated as any).isAdmin).toBeUndefined();
+  expect(Object.hasOwn(generated, '__proto__')).toBe(true);
+  expect(generated.name).toBe('demo');
+
+  class PlainDto {
+    name = '';
+
+    set label(value: string) {
+      this.name = value.toUpperCase();
+    }
+  }
+
+  const transformed = new ZodValidationPipe().transform(
+    { ...payload, label: 'safe' },
+    { type: 'body', metatype: PlainDto },
+  );
+  expect(Object.getPrototypeOf(transformed)).toBe(PlainDto.prototype);
+  expect((transformed as any).isAdmin).toBeUndefined();
+  expect((transformed as PlainDto).name).toBe('SAFE');
+});
+
+it.each(['constructor', 'toString'])('returns validation errors for key %s', (key) => {
+  const RecordDto = createZodDto(z.record(z.string(), z.string()));
+  const pipe = new ZodValidationPipe();
+
+  try {
+    pipe.transform(JSON.parse(`{"${key}":123}`), { type: 'body', metatype: RecordDto });
+    throw new Error('Expected validation error');
+  } catch (error) {
+    expect(error).toBeInstanceOf(HttpException);
+    const response = (error as HttpException).getResponse<{ errors: Record<string, string[]> }>();
+    expect(Object.hasOwn(response.errors, key)).toBe(true);
+    expect(response.errors[key]).toEqual([expect.any(String)]);
+    const serialized = JSON.stringify(response);
+    expect(JSON.parse(serialized).errors[key]).toEqual(response.errors[key]);
+  }
+});
+
 it('creates extendable DTO classes with schema metadata', () => {
   const schema = z.object({ id: z.number(), label: z.string() }).describe('Extend');
   class ExtendedDto extends createZodSchemaDto(schema) {}

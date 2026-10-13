@@ -80,6 +80,19 @@ interface BuildZodSchemaDtoOptions {
   name?: string;
 }
 
+function assignDtoValues<T extends object>(target: T, source: object): T {
+  if (Object.prototype.propertyIsEnumerable.call(source, '__proto__')) {
+    // An own data property prevents Object.assign from invoking the prototype setter.
+    Object.defineProperty(target, '__proto__', {
+      value: undefined,
+      enumerable: true,
+      configurable: true,
+      writable: true,
+    });
+  }
+  return Object.assign(target, source);
+}
+
 function buildZodSchemaDto<TSchema extends ZodType>(
   schema: TSchema,
   options: BuildZodSchemaDtoOptions,
@@ -88,7 +101,7 @@ function buildZodSchemaDto<TSchema extends ZodType>(
   class ZodSchemaDto {
     constructor(initial?: unknown) {
       if (initial && typeof initial === 'object') {
-        Object.assign(this, initial);
+        assignDtoValues(this, initial);
       }
     }
   }
@@ -200,14 +213,14 @@ export class ZodValidationPipe implements PipeTransform<unknown> {
       return value;
     }
 
-    return Object.assign(new Metatype!(), value);
+    return assignDtoValues(new Metatype!(), value);
   }
 
   private createValidationException(error: ZodError, metadata: ArgumentMetadata): HttpException {
     const statusCode = this.options.errorHttpStatusCode;
     const issues = this.options.stopAtFirstError ? error.issues.slice(0, 1) : error.issues;
 
-    const errors: Record<string, string[]> = {};
+    const errors: Record<string, string[]> = Object.create(null);
 
     for (const issue of issues) {
       const path = issue.path.length > 0 ? issue.path.join('.') : 'root';

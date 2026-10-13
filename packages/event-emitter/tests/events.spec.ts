@@ -295,6 +295,58 @@ describe('Redis Event System', () => {
     await app.close();
   });
 
+  it('dispatches remote messages only from its configured channel', async () => {
+    const app = await createApplication(EventTestModule);
+    const container = app.getContainer();
+    const emitter = container.resolve(EventEmitterService);
+    const redis = container.resolve(RedisAccessor).get();
+    const deliveries: unknown[] = [];
+    emitter.on('remote.channel', (payload) => {
+      deliveries.push(payload);
+    });
+    const message = JSON.stringify({ event: 'remote.channel', payload: { id: 'trusted' } });
+
+    redis.emit('another-app:events', message);
+    expect(deliveries).toEqual([]);
+
+    redis.emit('test:events', message);
+    expect(deliveries).toEqual([{ id: 'trusted' }]);
+    await app.close();
+  });
+
+  it('ignores messages from stopping, stopped, and retired subscribers', async () => {
+    const app = await createApplication(EventTestModule);
+    const container = app.getContainer();
+    const emitter = container.resolve(EventEmitterService);
+    const redis = container.resolve(RedisAccessor).get();
+    const deliveries: unknown[] = [];
+    emitter.on('remote.lifecycle', (payload) => {
+      deliveries.push(payload);
+    });
+    const message = JSON.stringify({ event: 'remote.lifecycle', payload: { id: 'active' } });
+    const unsubscribeSpy = vi.spyOn(redis, 'unsubscribe').mockImplementation(async () => {
+      redis.emit('test:events', message);
+      throw new Error('unsubscribe failed');
+    });
+    const quitSpy = vi.spyOn(redis, 'quit').mockRejectedValue(new Error('quit failed'));
+
+    await emitter.stop();
+    redis.emit('test:events', message);
+    expect(deliveries).toEqual([]);
+
+    const nextRedis = new FakeRedis();
+    await emitter.start({ redisClient: nextRedis, channel: 'test:events' });
+    redis.emit('test:events', message);
+    expect(deliveries).toEqual([]);
+
+    nextRedis.emit('test:events', message);
+    expect(deliveries).toEqual([{ id: 'active' }]);
+
+    unsubscribeSpy.mockRestore();
+    quitSpy.mockRestore();
+    await app.close();
+  });
+
   it('throws when emitting before the service has started', async () => {
     const emitter = new EventEmitterService();
     await expect(emitter.emit('not.started' as any, { ok: true })).rejects.toThrow(

@@ -127,6 +127,8 @@ emitter.off('my.event', handler);
 - **Error isolation**: A failing handler does not prevent other handlers from executing
 - **Lifecycle**: Subscriptions are cleaned up on `onModuleDestroy`
 
+Only trusted producers should have Redis permission to publish to the configured channel. Use a distinct channel for each application, and validate incoming payloads in event handlers; TypeScript event types do not provide runtime validation or authenticate producers.
+
 ## License
 
 MIT

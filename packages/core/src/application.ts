@@ -994,6 +994,11 @@ export class HonoHttpApplication {
   }
 
   useGlobalGuards(...guards: CanActivate[]): void {
+    for (const guard of guards) {
+      if (typeof guard?.canActivate !== 'function') {
+        throw new ReferenceError('Invalid guard configuration: expected CanActivate instance');
+      }
+    }
     this.globalEnhancers.guards.push(...guards);
   }
 
@@ -1168,11 +1173,8 @@ export class HonoHttpApplication {
     ];
 
     for (const guard of guards) {
-      if (!guard) {
-        continue;
-      }
       const canActivate = await guard.canActivate(context);
-      if (!canActivate) {
+      if (canActivate !== true) {
         this.logger.warn(`Guard blocked ${controller.name}.${String(handlerName)} execution`);
         throw new ForbiddenException();
       }
@@ -1487,9 +1489,12 @@ export class HonoHttpApplication {
       return context.get(cacheKey);
     }
 
-    const contentType = context.req.header('content-type') ?? '';
+    const contentType = (context.req.header('content-type') ?? '')
+      .split(';', 1)[0]
+      .trim()
+      .toLowerCase();
 
-    if (!contentType.includes('application/json')) {
+    if (contentType !== 'application/json') {
       context.set(cacheKey, null);
       return null;
     }

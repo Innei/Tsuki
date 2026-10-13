@@ -89,6 +89,45 @@ describe('ContainerRef utility', () => {
     resetContainerRef();
   });
 
+  it('isolates overlapping asynchronous scopes and restores a parent after nested failure', async () => {
+    const base = createTestContainer();
+    const first = createTestContainer();
+    const second = createTestContainer();
+    const nested = createTestContainer();
+    setContainerRef(base as any);
+
+    const results = await Promise.all([
+      runWithContainer(first as any, async () => {
+        await Promise.resolve();
+        expect(getContainerRef()).toBe(first);
+        expect(hasContainerRef()).toBe(true);
+        await expect(
+          runWithContainer(nested as any, async () => {
+            await Promise.resolve();
+            expect(getContainerRef()).toBe(nested);
+            throw new Error('nested failure');
+          }),
+        ).rejects.toThrow('nested failure');
+        return getContainerRef();
+      }),
+      runWithContainer(second as any, async () => {
+        await Promise.resolve();
+        return getContainerRef();
+      }),
+    ]);
+
+    expect(results[0]).toBe(first);
+    expect(results[1]).toBe(second);
+    expect(getContainerRef()).toBe(base);
+
+    resetContainerRef();
+    await runWithContainer(first as any, () => {
+      expect(hasContainerRef()).toBe(true);
+      expect(getContainerRef()).toBe(first);
+    });
+    expect(hasContainerRef()).toBe(false);
+  });
+
   it('falls back to AnonymousToken label when resolving undefined tokens', () => {
     const container = createTestContainer();
     ContainerRef.set(container as any);

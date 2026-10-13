@@ -147,9 +147,11 @@ export class EventEmitterService implements OnModuleDestroy {
     if (this.started) return;
     this.publisher = options.redisClient;
     this.channel = options.channel ?? 'tsuki:events';
-    this.subscriber = options.redisClient.duplicate();
+    const subscriber = options.redisClient.duplicate();
+    this.subscriber = subscriber;
 
-    const onMessage = async (_channel: string, message: string) => {
+    const onMessage = async (channel: string, message: string) => {
+      if (!this.started || this.subscriber !== subscriber || channel !== this.channel) return;
       try {
         const envelope = JSON.parse(message) as EventMessage;
         if (!envelope?.event || envelope.sourceId === this.sourceId) return;
@@ -167,22 +169,23 @@ export class EventEmitterService implements OnModuleDestroy {
 
   async stop(): Promise<void> {
     if (!this.started) return;
+    this.started = false;
+    const subscriber = this.subscriber;
     try {
-      if (this.subscriber) {
+      if (subscriber) {
         try {
-          await this.subscriber.unsubscribe(this.channel);
+          await subscriber.unsubscribe(this.channel);
         } catch (error) {
           this.logger.warn(`Failed to unsubscribe from channel: ${formatError(error)}`);
         }
         try {
-          await this.subscriber.quit();
+          await subscriber.quit();
         } catch (error) {
           this.logger.warn(`Failed to quit subscriber: ${formatError(error)}`);
         }
       }
     } finally {
-      this.subscriber = undefined;
-      this.started = false;
+      if (this.subscriber === subscriber) this.subscriber = undefined;
     }
   }
 

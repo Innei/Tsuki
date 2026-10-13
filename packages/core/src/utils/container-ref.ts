@@ -17,9 +17,12 @@
  *   await ContainerRef.runWith(otherContainer, () => doSomething())
  */
 
+import { AsyncLocalStorage } from 'node:async_hooks';
+
 import type { DependencyContainer } from 'tsyringe';
 
 let currentContainer: DependencyContainer | null = null;
+const scopedContainer = new AsyncLocalStorage<DependencyContainer>();
 
 export const ContainerRef = {
   /**
@@ -63,23 +66,24 @@ export const ContainerRef = {
   },
 
   /**
-   * Get the current global DI container.
+   * Get the scoped DI container or the global default.
    * Throws if the container is not initialized.
    */
   get(): DependencyContainer {
-    if (!currentContainer) {
+    const container = scopedContainer.getStore() ?? currentContainer;
+    if (!container) {
       throw new Error(
         'DI container has not been set. Ensure the application bootstrap assigns the container via ContainerRef.set(container).',
       );
     }
-    return currentContainer;
+    return container;
   },
 
   /**
    * Check whether a container has been set.
    */
   has(): boolean {
-    return currentContainer !== null;
+    return scopedContainer.getStore() !== undefined || currentContainer !== null;
   },
 
   /**
@@ -90,17 +94,10 @@ export const ContainerRef = {
   },
 
   /**
-   * Temporarily set the container for the duration of the provided function.
-   * Restores the previous container when the function completes or throws.
+   * Scope the container to the callback and its asynchronous work.
    */
   async runWith<T>(container: DependencyContainer, fn: () => Promise<T> | T): Promise<T> {
-    const previous = currentContainer;
-    currentContainer = container;
-    try {
-      return await Promise.resolve(fn());
-    } finally {
-      currentContainer = previous;
-    }
+    return await scopedContainer.run(container, fn);
   },
 };
 

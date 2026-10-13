@@ -78,6 +78,9 @@ await ContainerRef.runWith(testContainer, async () => {
 });
 ```
 
+`runWith` isolates each callback and its asynchronous work, including overlapping
+and nested calls. Outside a scope, `get` uses the global default configured by `set`.
+
 ### Request Execution Flow
 
 ```
