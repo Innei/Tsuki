@@ -8,7 +8,7 @@ Shared building blocks for the Tsuki framework — decorators, interfaces, excep
 pnpm add @tsuki-hono/common
 ```
 
-Peer dependency: `hono >= 4.0.0`
+Peer dependency: `hono >= 4.13.7`
 
 ## What's Included
 

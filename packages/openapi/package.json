@@ -34,7 +34,7 @@
     "reflect-metadata": "0.2.2",
     "tsyringe": "4.10.0",
     "unplugin-swc": "1.5.9",
-    "vitest": "4.1.9"
+    "vitest": "4.1.11"
   },
   "publishConfig": {
     "access": "public",

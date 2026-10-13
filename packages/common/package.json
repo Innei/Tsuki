@@ -34,12 +34,12 @@
   "devDependencies": {
     "@tsuki-hono/core": "workspace:*",
     "@types/node": "^25.9.3",
-    "hono": "4.12.26",
+    "hono": "4.13.13",
     "unplugin-swc": "1.5.9",
-    "vitest": "4.1.9"
+    "vitest": "4.1.11"
   },
   "peerDependencies": {
-    "hono": ">=4.0.0"
+    "hono": ">=4.13.7"
   },
   "publishConfig": {
     "access": "public",
