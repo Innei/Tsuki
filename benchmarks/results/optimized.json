@@ -1,0 +1,295 @@
+{
+  "environment": {
+    "architecture": "arm64",
+    "cpu": "Apple M4 Max",
+    "cpuCount": 16,
+    "freeMemoryBytes": 7938244608,
+    "hono": "4.13.13",
+    "node": "v24.18.0",
+    "nodeServer": "1.19.17",
+    "os": "darwin 27.0.0",
+    "totalMemoryBytes": 137438953472,
+    "tsuki": "0.0.6"
+  },
+  "measuredAt": "2026-10-14T07:43:58.284Z",
+  "runs": [
+    {
+      "implementation": "hono",
+      "method": "GET",
+      "round": 1,
+      "completed": 169362,
+      "elapsedSeconds": 3.0004028340000004,
+      "p50Ms": 0.5362919999997757,
+      "p95Ms": 0.8989580000002206,
+      "requestsPerSecond": 56446.42048754977
+    },
+    {
+      "implementation": "hono",
+      "method": "POST",
+      "round": 1,
+      "completed": 113217,
+      "elapsedSeconds": 3.0010526249999994,
+      "p50Ms": 0.7484999999996944,
+      "p95Ms": 1.4790419999999358,
+      "requestsPerSecond": 37725.762972916884
+    },
+    {
+      "implementation": "tsuki",
+      "method": "GET",
+      "round": 1,
+      "completed": 167270,
+      "elapsedSeconds": 3.000626791999999,
+      "p50Ms": 0.5278340000004391,
+      "p95Ms": 1.0084160000005795,
+      "requestsPerSecond": 55745.01982251182
+    },
+    {
+      "implementation": "tsuki",
+      "method": "POST",
+      "round": 1,
+      "completed": 111501,
+      "elapsedSeconds": 3.000959041,
+      "p50Ms": 0.7808330000007118,
+      "p95Ms": 1.5110420000000886,
+      "requestsPerSecond": 37155.12223813787
+    },
+    {
+      "implementation": "tsuki",
+      "method": "POST",
+      "round": 2,
+      "completed": 110501,
+      "elapsedSeconds": 3.000910499999998,
+      "p50Ms": 0.7768329999998969,
+      "p95Ms": 1.479457999997976,
+      "requestsPerSecond": 36822.49104063586
+    },
+    {
+      "implementation": "tsuki",
+      "method": "GET",
+      "round": 2,
+      "completed": 173443,
+      "elapsedSeconds": 3.0004446669999996,
+      "p50Ms": 0.5134579999976268,
+      "p95Ms": 0.98004199999923,
+      "requestsPerSecond": 57805.76522793114
+    },
+    {
+      "implementation": "hono",
+      "method": "POST",
+      "round": 2,
+      "completed": 120179,
+      "elapsedSeconds": 3.0008375419999975,
+      "p50Ms": 0.7099589999997988,
+      "p95Ms": 1.4190420000013546,
+      "requestsPerSecond": 40048.48590367312
+    },
+    {
+      "implementation": "hono",
+      "method": "GET",
+      "round": 2,
+      "completed": 172132,
+      "elapsedSeconds": 3.0004050839999983,
+      "p50Ms": 0.5235829999983252,
+      "p95Ms": 0.9187089999977616,
+      "requestsPerSecond": 57369.586832762514
+    },
+    {
+      "implementation": "hono",
+      "method": "GET",
+      "round": 3,
+      "completed": 170127,
+      "elapsedSeconds": 3.000366000000002,
+      "p50Ms": 0.5278340000004391,
+      "p95Ms": 0.9499999999970896,
+      "requestsPerSecond": 56702.08234595376
+    },
+    {
+      "implementation": "hono",
+      "method": "POST",
+      "round": 3,
+      "completed": 119084,
+      "elapsedSeconds": 3.0005619159999988,
+      "p50Ms": 0.7069999999948777,
+      "p95Ms": 1.4237500000017462,
+      "requestsPerSecond": 39687.23303625375
+    },
+    {
+      "implementation": "tsuki",
+      "method": "GET",
+      "round": 3,
+      "completed": 168032,
+      "elapsedSeconds": 3.000435209000003,
+      "p50Ms": 0.5200829999957932,
+      "p95Ms": 1.0027919999993173,
+      "requestsPerSecond": 56002.54239650866
+    },
+    {
+      "implementation": "tsuki",
+      "method": "POST",
+      "round": 3,
+      "completed": 110416,
+      "elapsedSeconds": 3.0009858340000064,
+      "p50Ms": 0.7789170000032755,
+      "p95Ms": 1.5120410000017728,
+      "requestsPerSecond": 36793.24265680614
+    },
+    {
+      "implementation": "tsuki",
+      "method": "POST",
+      "round": 4,
+      "completed": 108520,
+      "elapsedSeconds": 3.0011179170000033,
+      "p50Ms": 0.7803750000020955,
+      "p95Ms": 1.5279589999991003,
+      "requestsPerSecond": 36159.85875972493
+    },
+    {
+      "implementation": "tsuki",
+      "method": "GET",
+      "round": 4,
+      "completed": 171776,
+      "elapsedSeconds": 3.0003635829999986,
+      "p50Ms": 0.5172080000047572,
+      "p95Ms": 0.9920829999973648,
+      "requestsPerSecond": 57251.72808164966
+    },
+    {
+      "implementation": "hono",
+      "method": "POST",
+      "round": 4,
+      "completed": 118049,
+      "elapsedSeconds": 3.000859792000003,
+      "p50Ms": 0.7209169999987353,
+      "p95Ms": 1.4320000000006985,
+      "requestsPerSecond": 39338.392388310516
+    },
+    {
+      "implementation": "hono",
+      "method": "GET",
+      "round": 4,
+      "completed": 174016,
+      "elapsedSeconds": 3.000384542,
+      "p50Ms": 0.5189170000012382,
+      "p95Ms": 0.9171249999999418,
+      "requestsPerSecond": 57997.89912395836
+    },
+    {
+      "implementation": "hono",
+      "method": "GET",
+      "round": 5,
+      "completed": 175522,
+      "elapsedSeconds": 3.0003982090000063,
+      "p50Ms": 0.5181250000023283,
+      "p95Ms": 0.909417000002577,
+      "requestsPerSecond": 58499.568315133474
+    },
+    {
+      "implementation": "hono",
+      "method": "POST",
+      "round": 5,
+      "completed": 119664,
+      "elapsedSeconds": 3.000787209000002,
+      "p50Ms": 0.7112499999930151,
+      "p95Ms": 1.3980829999927664,
+      "requestsPerSecond": 39877.53601491705
+    },
+    {
+      "implementation": "tsuki",
+      "method": "GET",
+      "round": 5,
+      "completed": 170009,
+      "elapsedSeconds": 3.000433999999994,
+      "p50Ms": 0.5162500000005821,
+      "p95Ms": 0.9955000000045402,
+      "requestsPerSecond": 56661.46964072542
+    },
+    {
+      "implementation": "tsuki",
+      "method": "POST",
+      "round": 5,
+      "completed": 111294,
+      "elapsedSeconds": 3.001003874999995,
+      "p50Ms": 0.7766669999982696,
+      "p95Ms": 1.4984159999876283,
+      "requestsPerSecond": 37085.59023436789
+    },
+    {
+      "implementation": "tsuki",
+      "method": "POST",
+      "round": 6,
+      "completed": 111240,
+      "elapsedSeconds": 3.000927165999994,
+      "p50Ms": 0.7752079999918351,
+      "p95Ms": 1.4850420000002487,
+      "requestsPerSecond": 37068.54376884941
+    },
+    {
+      "implementation": "tsuki",
+      "method": "GET",
+      "round": 6,
+      "completed": 166246,
+      "elapsedSeconds": 3.000435958000002,
+      "p50Ms": 0.5279999999911524,
+      "p95Ms": 1.0172920000040904,
+      "requestsPerSecond": 55407.28158411168
+    },
+    {
+      "implementation": "hono",
+      "method": "POST",
+      "round": 6,
+      "completed": 121439,
+      "elapsedSeconds": 3.000798834000001,
+      "p50Ms": 0.7078750000073342,
+      "p95Ms": 1.4000410000007832,
+      "requestsPerSecond": 40468.89069139113
+    },
+    {
+      "implementation": "hono",
+      "method": "GET",
+      "round": 6,
+      "completed": 171306,
+      "elapsedSeconds": 3.0004624589999875,
+      "p50Ms": 0.5273339999985183,
+      "p95Ms": 0.9320830000069691,
+      "requestsPerSecond": 57093.19891210834
+    }
+  ],
+  "settings": {
+    "concurrency": 32,
+    "duration": 3,
+    "rounds": 6,
+    "warmup": 1
+  },
+  "summary": [
+    {
+      "method": "GET",
+      "hono": {
+        "requestsPerSecond": 57231.39287243543,
+        "p50Ms": 0.5254584999984218,
+        "p95Ms": 0.9179169999988517
+      },
+      "tsuki": {
+        "requestsPerSecond": 56332.006018617045,
+        "p50Ms": 0.5186455000002752,
+        "p95Ms": 0.9991460000019288
+      },
+      "throughputDropPercent": 1.5714921630914147,
+      "p50IncreasePercent": -1.29658193714004
+    },
+    {
+      "method": "POST",
+      "hono": {
+        "requestsPerSecond": 39782.384525585396,
+        "p50Ms": 0.710604499996407,
+        "p95Ms": 1.4213960000015504
+      },
+      "tsuki": {
+        "requestsPerSecond": 36945.51740474264,
+        "p50Ms": 0.7778750000015862,
+        "p95Ms": 1.5047289999938585
+      },
+      "throughputDropPercent": 7.130962999511182,
+      "p50IncreasePercent": 9.46665831774487
+    }
+  ]
+}

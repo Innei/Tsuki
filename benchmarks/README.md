@@ -76,3 +76,36 @@ Median p50 latency increased by 21.0% for GET and 49.0% for POST. Round three
 slowed substantially for both implementations; the cause was not profiled.
 It is retained in the raw results, and the table uses the six-round medians.
 All responses and server shutdowns passed the assertions.
+
+## Optimization rerun
+
+The request pipeline now caches route decorator metadata, skips empty enhancer
+paths, and avoids creating a default response before generating JSON. Request
+context retains AsyncLocalStorage isolation with fewer Promise wrappers. Global
+enhancer additions remain live, and decorator enhancers respect DI lifetimes.
+
+On 2026-10-14, the unmodified `v0.0.6` benchmark server was built and frozen before
+the optimization. That server and the optimized server were measured consecutively
+with the same runner, runtime, dependencies, and six-round configuration above.
+Each set includes its own Hono control. Builds, tests, and profiling were idle
+during measurement. Both measurements preceded the package version bump.
+
+| Route     | Before Tsuki req/s | After Tsuki req/s | Tsuki throughput gain | Before gap to Hono | After gap to Hono | After Hono req/s |
+| --------- | -----------------: | ----------------: | --------------------: | -----------------: | ----------------: | ---------------: |
+| GET JSON  |             45,424 |            56,332 |             **24.0%** |              21.2% |          **1.6%** |           57,231 |
+| POST JSON |             27,463 |            36,946 |             **34.5%** |              31.8% |          **7.1%** |           39,782 |
+
+After optimization, Hono/Tsuki p50 latency was 0.53/0.52 ms for GET and
+0.71/0.78 ms for POST; p95 was 0.92/1.00 ms and 1.42/1.50 ms respectively.
+The first round of the before run had a substantial slowdown in both servers;
+all rounds are retained and the table uses medians. The cause was not profiled.
+These whole-HTTP results retain the client and local-machine limits described
+above; a 1.6% gap does not measure isolated framework CPU cost.
+
+Raw measurements: [before-optimization.json](results/before-optimization.json)
+and [optimized.json](results/optimized.json). Every response and server shutdown
+passed the assertions in both runs. For another run of the current code:
+
+```sh
+pnpm bench --output results/optimized.json
+```
