@@ -8,6 +8,16 @@ Application runtime for the Tsuki framework — bootstraps modules, registers ro
 pnpm add @tsuki-hono/core
 ```
 
+For Node HTTP serving, use Node.js 20 or later and the current adapter:
+
+```bash
+pnpm add hono @hono/node-server@^2.1.5
+```
+
+Older 1.x adapters can discard modified response headers and cookies when
+`clone()` or a body getter materializes their lightweight Response. Upgrade the
+adapter in existing applications as well as the Tsuki packages.
+
 ## Quick Start
 
 ```ts

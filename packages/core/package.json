@@ -32,11 +32,12 @@
     "tsyringe": "4.10.0"
   },
   "devDependencies": {
+    "@hono/node-server": "^2.1.5",
     "@types/node": "^25.9.3",
     "hono": "4.13.13",
-    "unplugin-swc": "1.5.9",
+    "unplugin-swc": "1.6.0",
     "vitest": "4.1.11",
-    "zod": "^4.4.3"
+    "zod": "^4.6.7"
   },
   "peerDependencies": {
     "hono": ">=4.13.7"

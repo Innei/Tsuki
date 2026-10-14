@@ -64,6 +64,8 @@ pnpm test
 
 ## Minimal usage
 
+The Node example requires Node.js 20 or later and `@hono/node-server` 2.1.5 or later.
+
 ```ts
 import 'reflect-metadata';
 import { serve } from '@hono/node-server';

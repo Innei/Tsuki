@@ -21,6 +21,9 @@ Plus production-shaped scaffolding:
 
 ## Quickstart
 
+Development and builds require Node.js `^20.19.0 || >=22.12.0`. The starter uses
+`@hono/node-server` 2.1.5 or later.
+
 ```bash
 # 1. install deps (from the repo root in a workspace, or inside the copied directory)
 pnpm install
