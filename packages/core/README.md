@@ -58,6 +58,10 @@ const app = await createApplication(AppModule, {
 | `useGlobalMiddlewares(...middlewares)`   | Register global middlewares (MiddlewareDefinition[]) |
 | `close(signal?)`                         | Graceful shutdown — triggers lifecycle hooks         |
 
+Decorator metadata is collected when routes are registered. Use the `useGlobal*`
+methods for runtime additions; these remain effective after requests have started.
+Decorator enhancers follow the DI container's singleton or transient lifetime.
+
 ### `ContainerRef`
 
 Global DI container reference — useful for accessing the container outside of DI-managed code (decorators, utilities).

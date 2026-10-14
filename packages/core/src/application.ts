@@ -106,6 +106,8 @@ function createDefaultRegistry(): GlobalEnhancerRegistry {
 
 type HTTPMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'OPTIONS' | 'HEAD';
 
+type RouteParameterMetadata = RouteParamMetadataItem & { inferContextMetatype?: boolean };
+
 function isOnModuleInitHook(value: unknown): value is OnModuleInit {
   return (
     typeof value === 'object' &&
@@ -1101,6 +1103,17 @@ export class HonoHttpApplication {
       const method = route.method.toUpperCase() as HTTPMethod;
       const fullPath = this.buildPath(controllerMetadata, route.path);
 
+      const guards = collectGuards(controller, route.handlerName);
+      const interceptors = collectInterceptors(controller, route.handlerName);
+      const pipes = collectPipes(controller, route.handlerName);
+      const filters = collectFilters(controller, route.handlerName);
+      let metadataHandler = Reflect.get(controllerInstance, route.handlerName);
+      let paramsMetadata = this.getParametersMetadata(
+        controller,
+        route.handlerName,
+        metadataHandler,
+      );
+
       this.app.on(method, fullPath, async (context: Context) => {
         const handler = Reflect.get(controllerInstance, route.handlerName) as (
           ...args: any[]
@@ -1108,34 +1121,44 @@ export class HonoHttpApplication {
         const executionContext = createExecutionContext(this.container, controller, handler);
 
         try {
-          await this.executeGuards(controller, route.handlerName, executionContext);
+          if (handler !== metadataHandler) {
+            paramsMetadata = this.getParametersMetadata(controller, route.handlerName, handler);
+            metadataHandler = handler;
+          }
+          const requestParamsMetadata = paramsMetadata;
+          if (this.globalEnhancers.guards.length > 0 || guards.length > 0) {
+            await this.executeGuards(controller, route.handlerName, guards, executionContext);
+          }
 
-          const response = await this.executeInterceptors(
-            controller,
-            route.handlerName,
-            executionContext,
-            async () => {
-              const args = await this.resolveArguments(
-                controller,
-                route.handlerName,
-                handler,
-                context,
-                executionContext,
-              );
-              const result = await handler.apply(controllerInstance, args);
-              return this.transformResult(context, result);
-            },
-          );
+          const finalHandler =
+            requestParamsMetadata.length > 0
+              ? async () =>
+                  handler.apply(
+                    controllerInstance,
+                    await this.resolveArguments(
+                      controller,
+                      route.handlerName,
+                      requestParamsMetadata,
+                      pipes,
+                      context,
+                      executionContext,
+                    ),
+                  )
+              : () => handler.call(controllerInstance, context);
 
-          return response;
+          if (this.globalEnhancers.interceptors.length > 0 || interceptors.length > 0) {
+            return await this.executeInterceptors(
+              interceptors,
+              executionContext,
+              finalHandler,
+              context,
+            );
+          }
+          const honoContext = HttpContext.getValue('hono');
+          const result = await finalHandler();
+          return this.ensureResponse(honoContext, result === undefined ? context.res : result);
         } catch (error) {
-          return await this.handleException(
-            controller,
-            route.handlerName,
-            error,
-            executionContext,
-            context,
-          );
+          return await this.handleException(filters, error, executionContext, context);
         }
       });
 
@@ -1162,13 +1185,14 @@ export class HonoHttpApplication {
   private async executeGuards(
     controller: Constructor,
     handlerName: string | symbol,
+    guardConstructors: Array<Constructor<CanActivate>>,
     context: ReturnType<typeof createExecutionContext>,
   ): Promise<void> {
     const guards = [
       ...this.globalEnhancers.guards,
-      ...collectGuards(controller, handlerName).map((ctor) => {
+      ...guardConstructors.map((ctor) => {
         this.registerSingleton(ctor);
-        return this.getProviderInstance(ctor);
+        return this.resolveInstance(ctor);
       }),
     ];
 
@@ -1182,24 +1206,25 @@ export class HonoHttpApplication {
   }
 
   private async executeInterceptors(
-    controller: Constructor,
-    handlerName: string | symbol,
+    interceptorConstructors: Array<Constructor<Interceptor>>,
     executionContext: ReturnType<typeof createExecutionContext>,
-    finalHandler: () => Promise<unknown>,
+    finalHandler: () => unknown,
+    context: Context,
   ): Promise<Response> {
     const interceptorInstances = [
       ...this.globalEnhancers.interceptors,
-      ...collectInterceptors(controller, handlerName).map((ctor) => {
+      ...interceptorConstructors.map((ctor) => {
         this.registerSingleton(ctor);
-        return this.getProviderInstance(ctor);
+        return this.resolveInstance(ctor);
       }),
     ];
 
     const honoContext = HttpContext.getValue('hono');
-
     const callHandler: CallHandler = {
-      handle: async (): Promise<FrameworkResponse> =>
-        this.ensureResponse(honoContext, await finalHandler()),
+      handle: async (): Promise<FrameworkResponse> => {
+        const result = await finalHandler();
+        return this.ensureResponse(honoContext, result === undefined ? context.res : result);
+      },
     };
 
     const interceptors = interceptorInstances.filter(Boolean).reverse();
@@ -1216,17 +1241,16 @@ export class HonoHttpApplication {
   }
 
   private async handleException(
-    controller: Constructor,
-    handlerName: string | symbol,
+    filterConstructors: Array<Constructor<ExceptionFilter>>,
     error: unknown,
     executionContext: ReturnType<typeof createExecutionContext>,
     context: Context,
   ): Promise<Response> {
     const filters = [
       ...this.globalEnhancers.filters,
-      ...collectFilters(controller, handlerName).map((ctor) => {
+      ...filterConstructors.map((ctor) => {
         this.registerSingleton(ctor);
-        return this.getProviderInstance(ctor);
+        return this.resolveInstance(ctor);
       }),
     ];
     for (const filter of filters) {
@@ -1256,21 +1280,9 @@ export class HonoHttpApplication {
     return this.json(context, response, 500);
   }
 
-  private transformResult(context: Context, result: unknown): unknown {
-    if (result === undefined) {
-      return context.res;
-    }
-
-    return result;
-  }
-
   private ensureResponse(context: Context, payload: unknown): Response {
     if (payload instanceof Response) {
       return payload;
-    }
-
-    if (payload === context.res) {
-      return context.res;
     }
 
     if (payload === undefined) {
@@ -1278,19 +1290,21 @@ export class HonoHttpApplication {
     }
 
     if (typeof payload === 'string') {
-      return this.markGeneratedResponse(new Response(payload as BodyInit));
+      return this.markGeneratedResponse(context.newResponse(payload));
     }
 
     if (payload instanceof ArrayBuffer) {
-      return this.markGeneratedResponse(new Response(payload as BodyInit));
+      return this.markGeneratedResponse(context.newResponse(payload));
     }
 
     if (ArrayBuffer.isView(payload)) {
-      return this.markGeneratedResponse(new Response(payload as BodyInit));
+      return this.markGeneratedResponse(
+        context.newResponse(payload as Parameters<Context['newResponse']>[0]),
+      );
     }
 
     if (payload instanceof ReadableStream) {
-      return this.markGeneratedResponse(new Response(payload));
+      return this.markGeneratedResponse(context.newResponse(payload));
     }
 
     return this.markGeneratedResponse(context.json(payload));
@@ -1310,12 +1324,11 @@ export class HonoHttpApplication {
   }
 
   private getGlobalAndHandlerPipes(
-    controller: Constructor,
-    handlerName: string | symbol,
+    pipeConstructors: Array<Constructor<PipeTransform>>,
   ): PipeTransform[] {
-    const handlerPipeInstances = collectPipes(controller, handlerName).map((ctor) => {
+    const handlerPipeInstances = pipeConstructors.map((ctor) => {
       this.registerSingleton(ctor);
-      return this.getProviderInstance(ctor);
+      return this.resolveInstance(ctor);
     });
     return [...this.globalEnhancers.pipes, ...handlerPipeInstances].filter(Boolean);
   }
@@ -1323,11 +1336,11 @@ export class HonoHttpApplication {
   private async resolveArguments(
     controller: Constructor,
     handlerName: string | symbol,
-    handler: (...args: any[]) => any,
+    paramsMetadata: RouteParameterMetadata[],
+    pipeConstructors: Array<Constructor<PipeTransform>>,
     context: Context,
     executionContext: ReturnType<typeof createExecutionContext>,
   ): Promise<unknown[]> {
-    const paramsMetadata = this.getParametersMetadata(controller, handlerName, handler, context);
     if (isDebugEnabled()) {
       this.logger.debug('Resolved params metadata', {
         controller: controller.name,
@@ -1335,19 +1348,27 @@ export class HonoHttpApplication {
         paramsMetadata,
       });
     }
-    const maxIndex =
-      paramsMetadata.length > 0 ? Math.max(...paramsMetadata.map((item) => item.index)) : -1;
-    const args: unknown[] = Array.from({ length: maxIndex + 1 });
-    const sharedPipes = this.getGlobalAndHandlerPipes(controller, handlerName);
+    const args: unknown[] = Array.from({ length: paramsMetadata.at(-1)!.index + 1 });
+    const sharedPipes =
+      this.globalEnhancers.pipes.length > 0 || pipeConstructors.length > 0
+        ? this.getGlobalAndHandlerPipes(pipeConstructors)
+        : [];
 
-    // console.debug('Params metadata', controller.name, handlerName, paramsMetadata);
-    for (const metadata of paramsMetadata) {
-      const value = await this.resolveParameterValue(metadata, context, executionContext);
-      const transformed = await this.applyPipes(value, metadata, sharedPipes);
-      args[metadata.index] = transformed;
+    for (const parameter of paramsMetadata) {
+      const metadata = parameter.inferContextMetatype
+        ? { ...parameter, metatype: context.constructor as Constructor }
+        : parameter;
+      let value = this.resolveParameterValue(metadata, context, executionContext);
+      if (metadata.factory || metadata.type === RouteParamtypes.BODY) {
+        value = await value;
+      }
+      args[metadata.index] =
+        sharedPipes.length > 0 || (metadata.pipes?.length ?? 0) > 0
+          ? await this.applyPipes(value, metadata, sharedPipes)
+          : value;
     }
 
-    return args.length > 0 ? args : [context];
+    return args;
   }
 
   /* c8 ignore start */
@@ -1355,8 +1376,7 @@ export class HonoHttpApplication {
     controller: Constructor,
     handlerName: string | symbol,
     handler: (...args: any[]) => any,
-    context: Context,
-  ): RouteParamMetadataItem[] {
+  ): RouteParameterMetadata[] {
     const controllerMetadata = getRouteArgsMetadata(controller.prototype, handlerName);
     const paramTypes: Constructor[] = (Reflect.getMetadata(
       'design:paramtypes',
@@ -1371,6 +1391,7 @@ export class HonoHttpApplication {
       indexed.set(metadata.index, {
         ...metadata,
         metatype: metadata.metatype ?? paramTypes[metadata.index],
+        pipes: metadata.pipes?.filter(Boolean),
       });
     }
 
@@ -1383,7 +1404,7 @@ export class HonoHttpApplication {
       }
     }
 
-    const items: RouteParamMetadataItem[] = [];
+    const items: RouteParameterMetadata[] = [];
 
     if (maxIndex < 0) {
       return items;
@@ -1409,7 +1430,8 @@ export class HonoHttpApplication {
           items.push({
             index,
             type: RouteParamtypes.CONTEXT,
-            metatype: paramTypes[index] ?? context.constructor,
+            metatype: paramTypes[index],
+            inferContextMetatype: !paramTypes[index],
           });
         }
       }
@@ -1419,11 +1441,11 @@ export class HonoHttpApplication {
   }
   /* c8 ignore end */
 
-  private async resolveParameterValue(
+  private resolveParameterValue(
     metadata: RouteParamMetadataItem,
     context: Context,
     executionContext: ReturnType<typeof createExecutionContext>,
-  ): Promise<unknown> {
+  ): unknown {
     if (metadata.factory) {
       return metadata.factory(context, executionContext);
     }
@@ -1433,7 +1455,7 @@ export class HonoHttpApplication {
         return context.req;
       }
       case RouteParamtypes.BODY: {
-        return await this.readBody(context);
+        return this.readBody(context);
       }
       case RouteParamtypes.QUERY: {
         return metadata.data ? context.req.query(metadata.data) : context.req.query();
@@ -1461,7 +1483,7 @@ export class HonoHttpApplication {
   ): Promise<unknown> {
     const paramPipes = (metadata.pipes || []).filter(Boolean).map((ctor) => {
       this.registerSingleton(ctor);
-      return this.getProviderInstance(ctor);
+      return this.resolveInstance(ctor);
     });
     const pipes = [...sharedPipes, ...paramPipes];
 

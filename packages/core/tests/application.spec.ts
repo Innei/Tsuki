@@ -1076,7 +1076,7 @@ describe('HonoHttpApplication internals', () => {
   it('throws descriptive errors when dependency resolution fails', async () => {
     await expect(createApplication(BrokenModule)).rejects.toSatisfy((err) => {
       expect(err).toBeInstanceOf(Error);
-      const esc = String.fromCharCode(0x1B);
+      const esc = String.fromCharCode(0x1b);
       const message = (err as Error).message.replaceAll(new RegExp(`${esc}\\[[0-9;]*m`, 'g'), '');
       expect(message).toMatch(/failed to resolve provider brokencontroller/i);
       // Tsyringe quotes the parameter name; keep the rest of the line in scope for the word "missing".
@@ -1104,7 +1104,7 @@ describe('HonoHttpApplication internals', () => {
   it('reuses an existing response object without wrapping', async () => {
     const app = await createApplication(FactoryModule);
     const context = {
-      res: { sentinel: true },
+      res: new Response('existing'),
       json: () => new Response('never'),
     } as unknown as Context;
 
