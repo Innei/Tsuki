@@ -87,6 +87,9 @@ type ModuleProviderRegistration =
   | { generation: number; kind: 'alias'; target: InjectionToken };
 
 const GENERATED_RESPONSE = Symbol.for('hono.framework.generatedResponse');
+// Node adapters replace Response, but clone() still returns the platform constructor.
+const ResponseParent = Object.getPrototypeOf(Response) as typeof Response;
+const PlatformResponse = ResponseParent.prototype ? ResponseParent : Response;
 
 export interface ApplicationOptions {
   container?: DependencyContainer;
@@ -1281,7 +1284,7 @@ export class HonoHttpApplication {
   }
 
   private ensureResponse(context: Context, payload: unknown): Response {
-    if (payload instanceof Response) {
+    if (payload instanceof Response || payload instanceof PlatformResponse) {
       return payload;
     }
 

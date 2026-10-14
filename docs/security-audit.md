@@ -19,9 +19,11 @@ Package archives also omit `.gitignore`. The CLI now ships the starter's rules a
 
 ## Dependency changes
 
-Hono is updated to 4.13.13, with a supported peer minimum of 4.13.7; the Node adapter resolves to 1.19.17. The Hono upgrade includes the [upstream JSX escaping fix](https://github.com/honojs/hono/security/advisories/GHSA-hxh3-vqpv-xpqv). Development dependencies are refreshed within compatible ranges. Two scoped overrides replace vulnerable tar and esbuild versions held by old development-tool dependencies.
+Hono is updated to 4.13.13, with a supported peer minimum of 4.13.7; the Node adapter now resolves to 2.1.5. The Hono upgrade includes the [upstream JSX escaping fix](https://github.com/honojs/hono/security/advisories/GHSA-hxh3-vqpv-xpqv). Zod is updated to 4.6.7, unplugin-swc to 1.6.0, and the starter's Vite to 6.4.4. Two scoped overrides replace vulnerable tar and esbuild versions held by old development-tool dependencies.
 
-`pnpm audit --prod` reports no known vulnerabilities. The full audit retains one development-only warning for `braces` 3.0.3, used by ESLint, changelog tooling, and nodemon. [The advisory](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm) lists no patched release. Do not feed untrusted glob patterns into these tools.
+The adapter upgrade includes the [upstream fix for live response headers](https://github.com/honojs/node-server/pull/357): header and cookie mutations survive `clone()` and body access. Tsuki also recognizes native Responses returned by `clone()` after the adapter replaces the global Response constructor, preserving their body, status, and headers. Real Node HTTP regressions cover generated and explicit responses, nested interceptors, and concurrent streams. No response content is cached across requests.
+
+`pnpm audit --prod` reports no known vulnerabilities. The full audit retains one development-only warning for `braces` 3.0.3, used by ESLint, changelog tooling, and nodemon. [The advisory](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm) lists no patched release. Although audit output suggests `>=3.0.4`, that version is not published on npm as of 2026-10-14. Do not feed untrusted glob patterns into these tools.
 
 ## Compatibility and limits
 
@@ -30,4 +32,6 @@ Hono is updated to 4.13.13, with a supported peer minimum of 4.13.7; the Node ad
 - Existing starter cache entries need to be copied to `cache:<key>` to remain accessible.
 - Tsuki still assumes one active application per process. Temporary DI scopes are isolated; this does not introduce full multi-application support.
 - Redis producer permissions and runtime event payload validation remain application responsibilities.
+- Node HTTP applications must upgrade their own `@hono/node-server` dependency to 2.1.5 or later; upgrading Tsuki alone does not replace an application's adapter. Adapter 2.x requires Node.js 20 or later and removes the old `/vercel` export.
+- Zod 4.6 string length checks count Unicode code points rather than UTF-16 code units; an emoji counts as one character. Review existing non-ASCII length limits when upgrading.
 - No production deployment or live Redis/database penetration test was performed. The audit does not cover application-specific authentication or authorization rules.
