@@ -24,11 +24,7 @@ function ensureStore(): HttpContextStore {
 
 export const HttpContext = {
   async run<T>(context: Context, fn: () => Promise<T> | T): Promise<T> {
-    return await new Promise<T>((resolve, reject) => {
-      httpContextStorage.run({ values: { hono: context } }, () => {
-        Promise.resolve(fn()).then(resolve).catch(reject);
-      });
-    });
+    return httpContextStorage.run({ values: { hono: context } }, fn);
   },
 
   get<T = HttpContextValues>(): T {
@@ -53,10 +49,8 @@ export const HttpContext = {
 };
 
 class HttpContextInitializationMiddleware implements HttpMiddleware {
-  async use(context: Context, next: Next): Promise<Response | void> {
-    return await HttpContext.run(context, async () => {
-      return await next();
-    });
+  use(context: Context, next: Next): Promise<Response | void> {
+    return HttpContext.run(context, next);
   }
 }
 
