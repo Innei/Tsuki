@@ -109,3 +109,28 @@ passed the assertions in both runs. For another run of the current code:
 ```sh
 pnpm bench --output results/optimized.json
 ```
+
+## Response fix and adapter upgrade
+
+The response compatibility fix and dependency upgrades were measured on
+2026-10-14 with the same six-round configuration. Both implementations now use
+`@hono/node-server` 2.1.5 and Hono 4.13.13. Builds, tests, and profiling were idle
+during the measurement. The raw environment reports Tsuki 0.0.7 because this run
+preceded the 0.0.8 version bump.
+
+| Route     | Hono req/s | Tsuki req/s | Throughput drop | Hono p50 / p95 | Tsuki p50 / p95 |
+| --------- | ---------: | ----------: | --------------: | -------------: | --------------: |
+| GET JSON  |     56,987 |      57,174 |           -0.3% | 0.53 / 0.94 ms |  0.52 / 0.99 ms |
+| POST JSON |     51,205 |      51,446 |           -0.5% | 0.57 / 1.10 ms |  0.56 / 1.06 ms |
+
+Treat these small differences as local measurement noise. These results compare
+the current Tsuki and Hono HTTP paths; the adapter changed since the previous
+recording, so changes between recordings cannot be attributed solely to Tsuki.
+The client, network stack, and machine load remain part of the measurement.
+
+Raw measurements: [response-fix.json](results/response-fix.json). All response and
+server shutdown assertions passed. Reproduce with:
+
+```sh
+pnpm bench --output results/response-fix.json
+```
