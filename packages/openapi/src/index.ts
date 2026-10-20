@@ -869,8 +869,7 @@ function mapZodType(schema: ZodType): SchemaConversionResult {
 
   if (schema instanceof ZodRecord) {
     const valueSchema = ((schema as any).valueSchema ?? getDefinition(schema).valueType) as
-      | ZodType
-      | undefined;
+      ZodType | undefined;
     const valueType = valueSchema ? convertZodSchema(valueSchema).schema : { type: 'string' };
     return {
       schema: {

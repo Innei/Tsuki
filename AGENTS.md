@@ -71,7 +71,7 @@ Request → HttpContext.run() → Guards → Interceptors (pre) → Pipes → Ha
 ## Tech Stack
 
 - **Runtime**: Node.js, TypeScript 6.x (ESNext/ESModule)
-- **Package Manager**: pnpm 10.x with workspaces
+- **Package Manager**: pnpm 12.x with workspaces
 - **Build**: tsdown
 - **HTTP**: Hono 4.x
 - **DI**: tsyringe + reflect-metadata

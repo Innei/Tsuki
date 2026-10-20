@@ -69,8 +69,7 @@ export function getApiTags(target: object, propertyKey?: string | symbol): strin
   const store = propertyKey
     ? (getStore(target, API_TAGS_METADATA, propertyKey) as string[] | undefined)
     : (getStore((target as Constructor).prototype ?? target, API_TAGS_METADATA) as
-        | string[]
-        | undefined);
+        string[] | undefined);
   return store ? [...store] : [];
 }
 
@@ -80,7 +79,6 @@ export function getApiDoc(target: object, propertyKey?: string | symbol): ApiOpe
   const store = propertyKey
     ? (getStore(target, API_OPERATION_METADATA, propertyKey) as ApiOperationOptions | undefined)
     : (getStore((target as Constructor).prototype ?? target, API_OPERATION_METADATA) as
-        | ApiOperationOptions
-        | undefined);
+        ApiOperationOptions | undefined);
   return store ? { ...store } : {};
 }

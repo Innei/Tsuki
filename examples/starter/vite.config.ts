@@ -4,7 +4,6 @@ import { fileURLToPath } from 'node:url';
 
 import swc from 'unplugin-swc';
 import { defineConfig } from 'vite';
-import tsconfigPaths from 'vite-tsconfig-paths';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -14,8 +13,8 @@ nodeBuiltins.push(...nodeBuiltins.map((m) => `node:${m}`));
 const external = ['ioredis', 'pg', 'pg-native'];
 
 export default defineConfig({
+  resolve: { tsconfigPaths: true },
   plugins: [
-    tsconfigPaths(),
     swc.vite({
       jsc: {
         target: 'esnext',

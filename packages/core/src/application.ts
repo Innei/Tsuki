@@ -77,10 +77,7 @@ type ProviderConfig =
 
 type LifecycleResolver = () => unknown;
 type ProviderLifecycleClassification =
-  | 'module-singleton'
-  | 'module-transient'
-  | 'external'
-  | 'alias-cycle';
+  'module-singleton' | 'module-transient' | 'external' | 'alias-cycle';
 type ModuleProviderRegistration =
   | { generation: number; kind: 'singleton' }
   | { generation: number; kind: 'transient' }

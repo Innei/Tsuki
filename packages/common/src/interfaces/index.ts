@@ -41,11 +41,7 @@ export interface FactoryProvider<T = any> {
 }
 
 export type Provider =
-  | Constructor
-  | ClassProvider
-  | ExistingProvider
-  | ValueProvider
-  | FactoryProvider;
+  Constructor | ClassProvider | ExistingProvider | ValueProvider | FactoryProvider;
 
 export interface ModuleMetadata {
   controllers?: Constructor[];

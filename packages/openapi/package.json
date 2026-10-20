@@ -30,11 +30,11 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@types/node": "^25.9.3",
+    "@types/node": "^26.6.5",
     "reflect-metadata": "0.2.2",
     "tsyringe": "4.10.0",
-    "unplugin-swc": "1.6.0",
-    "vitest": "4.1.11"
+    "unplugin-swc": "2.0.0",
+    "vitest": "5.0.5"
   },
   "publishConfig": {
     "access": "public",

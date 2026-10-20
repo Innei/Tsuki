@@ -2,6 +2,8 @@ packages:
   - 'packages/*'
   - 'examples/*'
   - 'benchmarks'
+# common devDepends on core only for test helpers; core depends on common at runtime
+ignoreWorkspaceCycles: true
 overrides:
   '@esbuild-kit/core-utils@3.3.2>esbuild': '0.25.12'
   'giget@1.2.5>tar': '7.5.21'

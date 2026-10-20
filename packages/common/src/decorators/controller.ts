@@ -45,8 +45,7 @@ export function Controller(prefixOrOptions: string | ControllerOptions = ''): Cl
 
 export function getControllerMetadata(target: Constructor): ControllerMetadata {
   const metadata = Reflect.getMetadata(CONTROLLER_METADATA, target) as
-    | Partial<ControllerMetadata>
-    | undefined;
+    Partial<ControllerMetadata> | undefined;
 
   return {
     prefix: metadata?.prefix ?? '',

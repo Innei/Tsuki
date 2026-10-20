@@ -8,7 +8,7 @@ import pg from 'pg';
 
 import { env } from './env';
 
-const LOCK_KEY = 0x7375_6B69;
+const LOCK_KEY = 0x7375_6b69;
 const logger = createLogger('Migrate');
 
 const MIGRATIONS_FOLDER =

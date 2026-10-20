@@ -49,7 +49,25 @@ function readSelfVersion(): string {
   }
 }
 
-const SKIP_FILES = new Set(['node_modules', 'dist', '.env', '.tsbuildinfo', '.turbo']);
+const SKIP_FILES: Record<string, true> = {
+  'node_modules': true,
+  'dist': true,
+  '.env': true,
+  '.tsbuildinfo': true,
+  '.turbo': true,
+};
+
+// Standalone apps read pnpm settings from their own pnpm-workspace.yaml (the monorepo's does not ship with the template)
+const WORKSPACE_SETTINGS = `allowBuilds:
+  '@swc/core': true
+  esbuild: true
+  unrs-resolver: true
+
+onlyBuiltDependencies:
+  - '@swc/core'
+  - esbuild
+  - unrs-resolver
+`;
 
 interface CopyOptions {
   projectName: string;
@@ -62,7 +80,7 @@ function copyTemplate({ source, target, projectName }: CopyOptions): void {
     recursive: true,
     filter: (src) => {
       const base = path.basename(src);
-      return !SKIP_FILES.has(base) && (base === '.env.example' || !base.startsWith('.env.'));
+      return !SKIP_FILES[base] && (base === '.env.example' || !base.startsWith('.env.'));
     },
   });
 
@@ -75,6 +93,7 @@ function copyTemplate({ source, target, projectName }: CopyOptions): void {
   pkgJson.version = '0.0.0';
   pkgJson.private = true;
   writeFileSync(pkgJsonPath, `${JSON.stringify(pkgJson, null, 2)}\n`);
+  writeFileSync(path.resolve(target, 'pnpm-workspace.yaml'), WORKSPACE_SETTINGS);
 }
 
 function parseArgs(argv: string[]): { command: 'help' | 'version' | 'create'; target?: string } {
