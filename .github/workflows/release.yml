@@ -5,31 +5,46 @@ on:
     tags:
       - 'v*'
 
+# npm trusted publishing (OIDC). No NPM_TOKEN is used or required.
+#
+# npm authenticates GitHub Actions through an OIDC ID token, so `id-token:
+# write` is mandatory. Every package published by `pnpm publish:npm` must have
+# a Trusted Publisher configured on npmjs.com for:
+#   organization/user: innei
+#   repository:        tsuki
+#   workflow filename: release.yml
+# New trusted-publisher configurations default to allowing `npm stage publish`
+# only; enable `npm publish` as well, since this workflow publishes directly.
+# Missing or mismatched configuration surfaces as a 404 from the token
+# exchange endpoint, not as an auth error.
+#
+# Configure each published package once (npm >= 11.15, interactive login):
+#   npm trust github <package> --repo innei/tsuki --file release.yml \
+#     --allow-publish --yes
 jobs:
   release:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
-      id-token: write
+      contents: write # changelogithub creates the GitHub release
+      id-token: write # npm OIDC token exchange
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-          registry-url: https://registry.npmjs.org/
 
-      - run: pnpm install
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          # Release builds must not restore a dependency cache.
+          package-manager-cache: false
+
+      - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm test
 
       - run: pnpm publish:npm
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - run: npx changelogithub
         env:
