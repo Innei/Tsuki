@@ -4,7 +4,7 @@
   "description": "Scaffold a new Tsuki application from the official starter template",
   "repository": {
     "type": "git",
-    "url": "https://github.com/innei/tsuki",
+    "url": "https://github.com/Innei/Tsuki",
     "directory": "packages/create-tsuki-app"
   },
   "license": "MIT",

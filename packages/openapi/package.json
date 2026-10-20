@@ -4,7 +4,7 @@
   "description": "OpenAPI 3.1 document generation for Tsuki framework",
   "repository": {
     "type": "git",
-    "url": "https://github.com/innei/tsuki",
+    "url": "https://github.com/Innei/Tsuki",
     "directory": "packages/openapi"
   },
   "license": "MIT",
