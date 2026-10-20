@@ -1,6 +1,6 @@
 {
   "name": "create-tsuki-app",
-  "version": "0.0.10",
+  "version": "0.0.11",
   "description": "Scaffold a new Tsuki application from the official starter template",
   "repository": {
     "type": "git",

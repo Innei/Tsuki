@@ -1,6 +1,6 @@
 {
   "name": "@tsuki-hono/common",
-  "version": "0.0.10",
+  "version": "0.0.11",
   "description": "Shared decorators, interfaces, exceptions, pipes, logger, and context for Tsuki framework",
   "repository": {
     "type": "git",
