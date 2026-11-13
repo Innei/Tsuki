@@ -59,14 +59,10 @@ const SKIP_FILES: Record<string, true> = {
 
 // Standalone apps read pnpm settings from their own pnpm-workspace.yaml (the monorepo's does not ship with the template)
 const WORKSPACE_SETTINGS = `allowBuilds:
-  '@swc/core': true
   esbuild: true
-  unrs-resolver: true
 
 onlyBuiltDependencies:
-  - '@swc/core'
   - esbuild
-  - unrs-resolver
 `;
 
 interface CopyOptions {

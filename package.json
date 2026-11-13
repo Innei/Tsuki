@@ -7,34 +7,34 @@
     "build": "pnpm -r run build",
     "changelog": "changelogithub",
     "format": "prettier --write .",
-    "lint": "eslint . --fix",
+    "lint": "oxlint . --fix",
     "prepare": "simple-git-hooks",
     "publish:npm": "pnpm -r publish --access public --no-git-checks",
     "release": "bumpp -r --all",
     "test": "pnpm -r run test",
-    "typecheck": "pnpm -r exec tsc --noEmit"
+    "typecheck": "pnpm -r exec tsrs --noEmit"
   },
   "simple-git-hooks": {
     "pre-commit": "pnpm lint-staged"
   },
   "lint-staged": {
-    "*.{js,jsx,ts,tsx,mjs,cjs}": "eslint --fix",
+    "*.{js,jsx,ts,tsx,mjs,cjs,mts,cts}": "oxlint --fix",
     "*": "prettier --write --ignore-unknown"
   },
   "devDependencies": {
-    "@lobehub/eslint-config": "^2.1.5",
-    "@lobehub/prettier-config": "^2.1.5",
+    "@lobehub/oxlint-config": "^3.0.1",
+    "@lobehub/prettier-config": "^3.0.1",
     "bumpp": "^12.3.0",
     "changelogithub": "^15.0.5",
-    "eslint": "^10.13.0",
     "lint-staged": "^17.6.0",
-    "prettier": "^3.9.10",
-    "prettier-plugin-packagejson": "^3.0.2",
+    "oxlint": "^1.93.0",
+    "prettier": "^3.10.1",
+    "prettier-plugin-packagejson": "^3.1.0",
     "prettier-plugin-sh": "^0.20.2",
     "prettier-plugin-sort-json": "^4.2.0",
     "simple-git-hooks": "^2.14.0",
-    "tsdown": "^0.23.1",
-    "typescript": "^6.0.3"
+    "tsdown": "^0.23.7",
+    "tsrs": "0.25.0-ts7.1.0-beta"
   },
-  "packageManager": "pnpm@12.14.0"
+  "packageManager": "pnpm@12.18.0"
 }

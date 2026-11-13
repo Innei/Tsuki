@@ -7,12 +7,12 @@
     "build": "tsdown"
   },
   "dependencies": {
-    "@hono/node-server": "^2.1.5",
+    "@hono/node-server": "^2.1.8",
     "@tsuki-hono/common": "workspace:*",
     "@tsuki-hono/core": "workspace:*",
-    "hono": "4.13.13"
+    "hono": "4.13.18"
   },
   "devDependencies": {
-    "@types/node": "^25.9.3"
+    "@types/node": "^26.6.6"
   }
 }

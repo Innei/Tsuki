@@ -224,7 +224,7 @@ docker compose -f docker-compose.prod.yml run --rm migrate
 | `pnpm dev`         | nodemon + vite-node, watches `src/` |
 | `pnpm build`       | vite SSR build to `dist/main.mjs`   |
 | `pnpm start`       | run the built artifact with Node    |
-| `pnpm typecheck`   | `tsc --noEmit`                      |
+| `pnpm typecheck`   | `tsrs --noEmit`                     |
 | `pnpm test`        | vitest run                          |
 | `pnpm db:generate` | drizzle-kit: generate migration     |
 | `pnpm db:migrate`  | drizzle-kit: apply migrations       |

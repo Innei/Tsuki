@@ -1073,8 +1073,7 @@ function buildModuleDocumentTree(
     routes: controller.routes,
   }));
 
-  const nextAncestors = new Set(ancestors);
-  nextAncestors.add(node.module);
+  const nextAncestors = new Set([...ancestors, node.module]);
 
   const children: ModuleDocumentNode[] = [];
   for (const child of node.children) {

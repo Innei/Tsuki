@@ -8,7 +8,7 @@ COPY package.json pnpm-lock.yaml* ./
 RUN node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('./package.json','utf8')); for (const k of ['dependencies','devDependencies','peerDependencies']) { if (!p[k]) continue; for (const d in p[k]) if (typeof p[k][d]==='string' && p[k][d].startsWith('workspace:')) p[k][d]='latest'; } fs.writeFileSync('./package.json', JSON.stringify(p,null,2));"
 
 RUN pnpm install --no-frozen-lockfile --ignore-scripts \
-  && pnpm rebuild @swc/core esbuild || true
+  && pnpm rebuild esbuild || true
 
 COPY tsconfig.json vite.config.ts drizzle.config.ts ./
 COPY src ./src

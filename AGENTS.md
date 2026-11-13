@@ -31,11 +31,11 @@ cd packages/core && pnpm test:watch # Watch mode
 npx vitest run tests/foo.test.ts    # Run a single test file (from package dir)
 
 # Linting
-pnpm lint   # ESLint with auto-fix (lobehub config)
+pnpm lint   # Oxlint with auto-fix (lobehub config)
 pnpm format # Prettier
 ```
 
-Pre-commit hook runs lint-staged (eslint + prettier on changed files) via simple-git-hooks.
+Pre-commit hook runs lint-staged (oxlint + prettier on changed files) via simple-git-hooks.
 
 ## Architecture
 
@@ -62,7 +62,7 @@ Request → HttpContext.run() → Guards → Interceptors (pre) → Pipes → Ha
 
 ## Testing
 
-- Vitest + SWC (via unplugin-swc), `maxConcurrency: 1` per config
+- Vitest + Vite's native Oxc transform (legacy decorators and metadata from tsconfig), `maxConcurrency: 1` per config
 - `vitest.setup.ts` in each package imports `reflect-metadata`
 - Integration tests: `createApplication(Module)` → `app.getInstance().request(path)` → assert response
 - Clean up: `await app.close()` in afterEach
@@ -70,10 +70,10 @@ Request → HttpContext.run() → Guards → Interceptors (pre) → Pipes → Ha
 
 ## Tech Stack
 
-- **Runtime**: Node.js, TypeScript 6.x (ESNext/ESModule)
+- **Runtime**: Node.js, TypeScript (ESNext/ESModule), typechecked with tsrs
 - **Package Manager**: pnpm 12.x with workspaces
 - **Build**: tsdown
 - **HTTP**: Hono 4.x
 - **DI**: tsyringe + reflect-metadata
 - **Validation**: Zod 4.x
-- **Lint**: ESLint (lobehub config) + Prettier (lobehub config)
+- **Lint**: Oxlint (lobehub config) + Prettier (lobehub config)
