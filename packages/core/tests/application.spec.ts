@@ -1401,6 +1401,7 @@ describe('HonoHttpApplication internals', () => {
       .mockImplementation((definition: any) => definition);
     const hono = app.getInstance();
     const useSpy = vi.spyOn(hono, 'use');
+    appAny.middlewareLogger.setLevel('verbose');
     const verboseSpy = vi.spyOn(appAny.middlewareLogger, 'verbose');
 
     const AnonymousMiddleware = class {

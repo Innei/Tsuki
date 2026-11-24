@@ -254,6 +254,47 @@ describe('PrettyLogger', () => {
     expect(baseWriter.debug).toHaveBeenCalledTimes(1);
   });
 
+  it('reports whether a level is enabled', () => {
+    const logger = createLogger('Levels', { writer: baseWriter, minLevel: 'info' });
+
+    expect(logger.isLevelEnabled('debug')).toBe(false);
+    expect(logger.isLevelEnabled('verbose')).toBe(false);
+    expect(logger.isLevelEnabled('info')).toBe(true);
+    expect(logger.isLevelEnabled('error')).toBe(true);
+
+    logger.setLevel('verbose');
+    expect(logger.isLevelEnabled('verbose')).toBe(true);
+    expect(logger.isLevelEnabled('debug')).toBe(false);
+  });
+
+  it('honours an explicit minLevel regardless of NODE_ENV', () => {
+    const originalNodeEnv = process.env.NODE_ENV;
+    try {
+      process.env.NODE_ENV = 'production';
+      const verboseLogger = createLogger('Explicit', {
+        writer: baseWriter,
+        clock: () => fixedDate,
+        colors: false,
+        minLevel: 'verbose',
+      });
+      verboseLogger.verbose('shown');
+      expect(baseWriter.verbose).toHaveBeenCalledTimes(1);
+
+      process.env.NODE_ENV = 'development';
+      const warnLogger = createLogger('Explicit', {
+        writer: baseWriter,
+        clock: () => fixedDate,
+        colors: false,
+        minLevel: 'warn',
+      });
+      warnLogger.info('hidden');
+      expect(warnLogger.getLevel()).toBe('warn');
+      expect(baseWriter.info).not.toHaveBeenCalled();
+    } finally {
+      process.env.NODE_ENV = originalNodeEnv;
+    }
+  });
+
   it('appends context segments from registered providers', () => {
     const unregister = registerLoggerContextProvider(() => 'tenant:demo');
 

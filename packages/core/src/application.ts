@@ -12,6 +12,7 @@ import type {
   GlobalEnhancerRegistry,
   HttpMiddleware,
   Interceptor,
+  LogLevel,
   MiddlewareDefinition,
   MiddlewareMetadata,
   MiddlewarePath,
@@ -84,6 +85,7 @@ type ModuleProviderRegistration =
   | { generation: number; kind: 'alias'; target: InjectionToken };
 
 const GENERATED_RESPONSE = Symbol.for('hono.framework.generatedResponse');
+const TSYRINGE_INJECTION_TOKENS = 'injectionTokens';
 // Node adapters replace Response, but clone() still returns the platform constructor.
 const ResponseParent = Object.getPrototypeOf(Response) as typeof Response;
 const PlatformResponse = ResponseParent.prototype ? ResponseParent : Response;
@@ -91,7 +93,9 @@ const PlatformResponse = ResponseParent.prototype ? ResponseParent : Response;
 export interface ApplicationOptions {
   container?: DependencyContainer;
   globalPrefix?: string;
+  lazyControllers?: boolean;
   logger?: PrettyLogger;
+  minLevel?: LogLevel;
 }
 
 function createDefaultRegistry(): GlobalEnhancerRegistry {
@@ -107,6 +111,22 @@ function createDefaultRegistry(): GlobalEnhancerRegistry {
 type HTTPMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'OPTIONS' | 'HEAD';
 
 type RouteParameterMetadata = RouteParamMetadataItem & { inferContextMetatype?: boolean };
+
+function isLevelEnabled(logger: PrettyLogger, level: LogLevel): boolean {
+  return typeof logger.isLevelEnabled === 'function' ? logger.isLevelEnabled(level) : true;
+}
+
+function getConstructorDependencies(target: Constructor): unknown[] {
+  const dependencies: unknown[] = [
+    ...((Reflect.getMetadata('design:paramtypes', target) as unknown[] | undefined) ?? []),
+  ];
+  const injectionTokens = (Reflect.getOwnMetadata(TSYRINGE_INJECTION_TOKENS, target) ??
+    {}) as Record<string, unknown>;
+  for (const [index, token] of Object.entries(injectionTokens)) {
+    dependencies[Number(index)] = token;
+  }
+  return dependencies;
+}
 
 function isOnModuleInitHook(value: unknown): value is OnModuleInit {
   return (
@@ -158,6 +178,7 @@ export class HonoHttpApplication {
   private readonly middlewareLogger: PrettyLogger;
   private readonly moduleName: string;
   private readonly instances = new Map<Constructor, unknown>();
+  private readonly resolvableConstructors = new Set<Constructor>();
   private readonly moduleProviderRegistrations = new Map<
     InjectionToken,
     ModuleProviderRegistration
@@ -185,7 +206,7 @@ export class HonoHttpApplication {
     private readonly options: ApplicationOptions = {},
     private readonly app: Hono = new Hono(),
   ) {
-    this.logger = options.logger ?? createLogger('Framework');
+    this.logger = options.logger ?? createLogger('Framework', { minLevel: options.minLevel });
     this.diLogger = this.logger.extend('DI');
     this.routerLogger = this.logger.extend('Router');
     this.middlewareLogger = this.logger.extend('Middleware');
@@ -202,7 +223,9 @@ export class HonoHttpApplication {
   }
 
   async init(): Promise<void> {
-    this.logger.verbose(`Bootstrapping application for module ${this.moduleName}`);
+    if (isLevelEnabled(this.logger, 'verbose')) {
+      this.logger.verbose(`Bootstrapping application for module ${this.moduleName}`);
+    }
     await this.registerModule(this.rootModule);
 
     // First, instantiate providers that participate in lifecycle hooks
@@ -728,10 +751,12 @@ export class HonoHttpApplication {
         this.app.use(path as any, middlewareFn);
       }
 
-      this.middlewareLogger.verbose(
-        `Registered middleware ${handlerName} on ${this.describeMiddlewarePath(path)}`,
-        colors.green(`+${performance.now().toFixed(2)}ms`),
-      );
+      if (isLevelEnabled(this.middlewareLogger, 'verbose')) {
+        this.middlewareLogger.verbose(
+          `Registered middleware ${handlerName} on ${this.describeMiddlewarePath(path)}`,
+          colors.green(`+${performance.now().toFixed(2)}ms`),
+        );
+      }
     }
   }
 
@@ -749,12 +774,13 @@ export class HonoHttpApplication {
     } else {
       this.container.register(token, { useClass } as any);
     }
-    const name = this.formatTokenName(useClass);
-    this.diLogger.debug(
-      'Registered class provider',
-      colors.yellow(name),
-      colors.green(`+${performance.now().toFixed(2)}ms`),
-    );
+    if (isLevelEnabled(this.diLogger, 'debug')) {
+      this.diLogger.debug(
+        'Registered class provider',
+        colors.yellow(this.formatTokenName(useClass)),
+        colors.green(`+${performance.now().toFixed(2)}ms`),
+      );
+    }
     if (isSingleton) {
       this.enqueueModuleProviderLifecycleResolver(
         token,
@@ -771,11 +797,13 @@ export class HonoHttpApplication {
   private registerExistingProvider(token: InjectionToken, useExisting: InjectionToken): number {
     const generation = this.trackProviderAlias(token, useExisting);
     this.container.register(token, { useToken: useExisting } as any);
-    this.diLogger.debug(
-      'Registered existing provider alias',
-      colors.yellow(String(token)),
-      colors.green(`+${performance.now().toFixed(2)}ms`),
-    );
+    if (isLevelEnabled(this.diLogger, 'debug')) {
+      this.diLogger.debug(
+        'Registered existing provider alias',
+        colors.yellow(String(token)),
+        colors.green(`+${performance.now().toFixed(2)}ms`),
+      );
+    }
     return generation;
   }
 
@@ -785,12 +813,13 @@ export class HonoHttpApplication {
   private registerValueProvider(token: InjectionToken, useValue: unknown): number {
     const generation = this.trackProviderLifetime(token, true);
     this.container.register(token, { useValue } as any);
-    const name = this.formatTokenName(token as unknown as Constructor);
-    this.diLogger.debug(
-      'Registered value provider',
-      colors.yellow(name),
-      colors.green(`+${performance.now().toFixed(2)}ms`),
-    );
+    if (isLevelEnabled(this.diLogger, 'debug')) {
+      this.diLogger.debug(
+        'Registered value provider',
+        colors.yellow(this.formatTokenName(token as unknown as Constructor)),
+        colors.green(`+${performance.now().toFixed(2)}ms`),
+      );
+    }
     return generation;
   }
 
@@ -826,11 +855,13 @@ export class HonoHttpApplication {
       this.container.register(token, { useFactory: factory } as any);
     }
 
-    this.diLogger.debug(
-      'Registered factory provider',
-      colors.yellow(String(token)),
-      colors.green(`+${performance.now().toFixed(2)}ms`),
-    );
+    if (isLevelEnabled(this.diLogger, 'debug')) {
+      this.diLogger.debug(
+        'Registered factory provider',
+        colors.yellow(String(token)),
+        colors.green(`+${performance.now().toFixed(2)}ms`),
+      );
+    }
     return generation;
   }
 
@@ -980,12 +1011,14 @@ export class HonoHttpApplication {
   private registerModuleOwnedSingleton<T>(token: Constructor<T>): void {
     const injectionToken = token as unknown as InjectionToken<T>;
     this.container.registerSingleton(injectionToken, token);
-    const providerName = token.name && token.name.length > 0 ? token.name : token.toString();
-    this.diLogger.debug(
-      'Registered singleton provider',
-      colors.yellow(providerName),
-      colors.green(`+${performance.now().toFixed(2)}ms`),
-    );
+    if (isLevelEnabled(this.diLogger, 'debug')) {
+      const providerName = token.name && token.name.length > 0 ? token.name : token.toString();
+      this.diLogger.debug(
+        'Registered singleton provider',
+        colors.yellow(providerName),
+        colors.green(`+${performance.now().toFixed(2)}ms`),
+      );
+    }
   }
 
   private registerSingleton<T>(token: Constructor<T>): void {
@@ -1022,7 +1055,9 @@ export class HonoHttpApplication {
     }
 
     this.registeredModules.add(moduleClass);
-    this.logger.debug('Registering module', moduleClass.name);
+    if (isLevelEnabled(this.logger, 'debug')) {
+      this.logger.debug('Registering module', moduleClass.name);
+    }
 
     const metadata = getModuleMetadata(moduleClass);
 
@@ -1044,11 +1079,13 @@ export class HonoHttpApplication {
       this.pendingControllers.push(controller as Constructor);
     }
 
-    this.logger.debug(
-      'Module registration complete',
-      colors.yellow(moduleClass.name),
-      colors.green(`+${performance.now().toFixed(2)}ms`),
-    );
+    if (isLevelEnabled(this.logger, 'debug')) {
+      this.logger.debug(
+        'Module registration complete',
+        colors.yellow(moduleClass.name),
+        colors.green(`+${performance.now().toFixed(2)}ms`),
+      );
+    }
   }
 
   private async invokeModuleInit(): Promise<void> {
@@ -1095,9 +1132,13 @@ export class HonoHttpApplication {
   }
 
   private registerController(controller: Constructor): void {
-    const controllerInstance = this.getProviderInstance(controller);
     const controllerMetadata = getControllerMetadata(controller);
     const routes = getRoutesMetadata(controller);
+    let controllerInstance: object | undefined = this.shouldDeferController(controller, routes)
+      ? undefined
+      : this.getProviderInstance(controller);
+    const resolveController = (): object =>
+      (controllerInstance ??= this.getProviderInstance(controller));
 
     for (const route of routes) {
       const method = route.method.toUpperCase() as HTTPMethod;
@@ -1107,7 +1148,10 @@ export class HonoHttpApplication {
       const interceptors = collectInterceptors(controller, route.handlerName);
       const pipes = collectPipes(controller, route.handlerName);
       const filters = collectFilters(controller, route.handlerName);
-      let metadataHandler = Reflect.get(controllerInstance, route.handlerName);
+      let metadataHandler = Reflect.get(
+        controllerInstance ?? controller.prototype,
+        route.handlerName,
+      );
       let paramsMetadata = this.getParametersMetadata(
         controller,
         route.handlerName,
@@ -1115,9 +1159,18 @@ export class HonoHttpApplication {
       );
 
       this.app.on(method, fullPath, async (context: Context) => {
-        const handler = Reflect.get(controllerInstance, route.handlerName) as (
-          ...args: any[]
-        ) => any;
+        let instance: object;
+        try {
+          instance = resolveController();
+        } catch (error) {
+          return await this.handleException(
+            filters,
+            error,
+            createExecutionContext(this.container, controller, metadataHandler),
+            context,
+          );
+        }
+        const handler = Reflect.get(instance, route.handlerName) as (...args: any[]) => any;
         const executionContext = createExecutionContext(this.container, controller, handler);
 
         try {
@@ -1134,7 +1187,7 @@ export class HonoHttpApplication {
             requestParamsMetadata.length > 0
               ? async () =>
                   handler.apply(
-                    controllerInstance,
+                    instance,
                     await this.resolveArguments(
                       controller,
                       route.handlerName,
@@ -1144,7 +1197,7 @@ export class HonoHttpApplication {
                       executionContext,
                     ),
                   )
-              : () => handler.call(controllerInstance, context);
+              : () => handler.call(instance, context);
 
           if (this.globalEnhancers.interceptors.length > 0 || interceptors.length > 0) {
             return await this.executeInterceptors(
@@ -1162,12 +1215,77 @@ export class HonoHttpApplication {
         }
       });
 
-      this.routerLogger.verbose(
-        `Mapped route ${method} ${fullPath} -> ${controller.name}.${String(route.handlerName)}`,
+      if (isLevelEnabled(this.routerLogger, 'verbose')) {
+        this.routerLogger.verbose(
+          `Mapped route ${method} ${fullPath} -> ${controller.name}.${String(route.handlerName)}`,
+          colors.green(`+${performance.now().toFixed(2)}ms`),
+        );
+      }
+    }
+  }
 
-        colors.green(`+${performance.now().toFixed(2)}ms`),
+  private shouldDeferController(
+    controller: Constructor,
+    routes: ReturnType<typeof getRoutesMetadata>,
+  ): boolean {
+    if (!this.options.lazyControllers || this.hasLifecycleConstructor(controller)) {
+      return false;
+    }
+    for (const route of routes) {
+      if (typeof Reflect.get(controller.prototype, route.handlerName) !== 'function') {
+        return false;
+      }
+    }
+    return this.isConstructorResolvable(controller, new Set());
+  }
+
+  // Approximates what ContainerRef's strict resolve accepts without constructing anything; a false
+  // negative only keeps the controller eager, so init still throws the container's own error.
+  private isConstructorResolvable(target: Constructor, path: Set<unknown>): boolean {
+    if (this.resolvableConstructors.has(target)) {
+      return true;
+    }
+    if (path.has(target)) {
+      return false;
+    }
+
+    if (!this.container.isRegistered(target as InjectionToken, true)) {
+      return false;
+    }
+    const dependencies = getConstructorDependencies(target);
+    if (dependencies.length === 0 && target.length > 0) {
+      return false;
+    }
+
+    path.add(target);
+    const resolvable = dependencies.every((dependency) =>
+      this.isDependencyResolvable(dependency, path),
+    );
+    path.delete(target);
+
+    if (resolvable) {
+      this.resolvableConstructors.add(target);
+    }
+    return resolvable;
+  }
+
+  private isDependencyResolvable(dependency: unknown, path: Set<unknown>): boolean {
+    if (dependency == null) {
+      return false;
+    }
+
+    if (typeof dependency === 'object') {
+      return (
+        'token' in dependency &&
+        this.isDependencyResolvable((dependency as { token: unknown }).token, path)
       );
     }
+
+    if (typeof dependency === 'function') {
+      return this.isConstructorResolvable(dependency as Constructor, path);
+    }
+
+    return this.container.isRegistered(dependency as InjectionToken, true);
   }
 
   private buildPath(

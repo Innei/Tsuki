@@ -161,6 +161,10 @@ export class PrettyLogger {
     return this.minLevel;
   }
 
+  isLevelEnabled(level: LogLevel): boolean {
+    return levelPriority[level] >= levelPriority[this.minLevel];
+  }
+
   extend(childNamespace: string): PrettyLogger {
     const combined = this.namespace ? `${this.namespace}:${childNamespace}` : childNamespace;
     return new PrettyLogger(combined, {
@@ -177,8 +181,7 @@ export class PrettyLogger {
   }
 
   private write(level: LogLevel, args: unknown[]): void {
-    // 检查日志级别 - 如果当前级别优先级 >= 最小级别优先级，则输出
-    if (levelPriority[level] >= levelPriority[this.minLevel]) {
+    if (this.isLevelEnabled(level)) {
       const method = this.resolveWriter(level);
       const timestamp = this.clock().toISOString();
 
